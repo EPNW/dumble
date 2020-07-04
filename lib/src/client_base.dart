@@ -345,8 +345,6 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
   }
 
   void _handleServerSync(Proto.ServerSync message) {
-    print('Selfe Premissions? ' +
-        new Permission.fromInt(message.permissions.toInt()).toString());
     _selfe = asSelfe(user: _users[message.session]);
     _users.remove(message.session);
     _serverInfo._maxBandwidth = message.maxBandwidth;

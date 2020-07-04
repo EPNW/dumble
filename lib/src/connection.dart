@@ -9,6 +9,7 @@ import 'package:meta/meta.dart';
 import 'audio_packet.dart';
 import 'messages.dart' as Messages;
 
+/// Return `true` to trust the certificate or `false` to consider it bad.
 typedef bool OnBadCertificate(X509Certificate certificate);
 
 class Connection {

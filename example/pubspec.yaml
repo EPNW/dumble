@@ -1,0 +1,10 @@
+name: dumble_examples
+version: 1.0.0
+author: EPNW <prokopwieler.hardundsoftware@gmail.com>
+description: Examples how to use the dumble Mumble client
+environment:
+  sdk: ">=2.5.0 <3.0.0"
+dependencies:
+  opus_dart: ^1.0.2
+  dumble:
+    path: ..

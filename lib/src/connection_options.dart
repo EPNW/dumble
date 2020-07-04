@@ -11,17 +11,34 @@ String get os => 'Dart VM';
 String get osVersion => Platform.version;
 
 class ConnectionOptions with JsonString {
+  /// The Mumble server.
   final String host;
+
+  /// The port of the Mumble server.
   final int port;
+
+  /// The users name.
   final String name;
+
+  /// A password, if this user is the superuser.
   final String password;
+
+  /// The connections security context containing this users certificate (see the constructor).
   final SecurityContext context;
+  
   final List<String> _tokens;
   final List<int> _celtVersions;
+
+  /// True if this client supports opus.
   final bool opus;
+
+  /// The supported celt versions.
   List<int> get celtVersions => _celtVersions ?? new List<int>();
   List<String> get tokens => _tokens ?? new List<String>();
 
+  /// Configures [ConnectionOptions] with a manially initalized [SecurityContext].
+  ///
+  /// See the matching field documentation for more information about the parameters.
   const ConnectionOptions.withSecurityContext(
       {@required this.host,
       @required this.port,
@@ -34,6 +51,12 @@ class ConnectionOptions with JsonString {
       : this._tokens = tokens,
         this._celtVersions = celtVersions;
 
+  /// Like [ConnectionOptions.withSecurityContext] but initalizes a [SecurityContext].
+  ///
+  /// The [SecurityContext] trusts this runtimes root certificates.
+  /// The users certificate set to `clientCertificate` which must be in p12 or pem format
+  /// and contain the users certificate (chain) and the private key. If the private key is encrypted,
+  /// `clientCertificateStorePassword` must be given.
   ConnectionOptions(
       {@required String host,
       @required int port,

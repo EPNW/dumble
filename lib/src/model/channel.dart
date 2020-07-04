@@ -114,7 +114,8 @@ class Channel with Notifier<ChannelListener>, JsonString {
   int get channelId => _channelId;
   Channel get parent => _parent;
   String get name => _name;
-  List<Channel> get links => new List<Channel>.unmodifiable(_links);
+  List<Channel> get links =>
+      _links != null ? new List<Channel>.unmodifiable(_links) : null;
   String get description => _description;
   bool get temporary => _temporary;
   int get position => _position;
@@ -133,7 +134,8 @@ class Channel with Notifier<ChannelListener>, JsonString {
                     serializeParentRecursionDepth - 1)
             : parent?.channelId)
         ..['name'] = name
-        ..['links'] = links.map((Channel channel) => channel.channelId)
+        ..['links'] =
+            links?.map((Channel channel) => channel.channelId)?.toList()
         ..['description'] = description
         ..['temporary'] = temporary
         ..['position'] = position
