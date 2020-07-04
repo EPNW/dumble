@@ -2,6 +2,7 @@ name: dumble
 version: 0.7.0
 author: EPNW <prokopwieler.hardundsoftware@gmail.com>
 description: A Mumble transport client framework supporting multiple Mumble features such as fully encrypted udp transport or user management.
+homepage: https://github.com/EPNW/dumble
 environment:
   sdk: '>=2.5.0 <3.0.0'
 dependencies:
@@ -9,3 +10,4 @@ dependencies:
   meta: ^1.1.8
   pointycastle: ^1.0.2
   convert: ^2.1.1
+  fixnum: ^0.10.11
