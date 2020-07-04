@@ -1,10 +1,10 @@
 name: dumble
-version: 0.7.0
+version: 0.7.1
 author: EPNW <prokopwieler.hardundsoftware@gmail.com>
 description: A Mumble transport client framework supporting multiple Mumble features such as fully encrypted udp transport or user management.
 homepage: https://github.com/EPNW/dumble
 environment:
-  sdk: '>=2.5.0 <3.0.0'
+  sdk: '>=2.7.0 <3.0.0'
 dependencies:
   protobuf: ^1.0.1
   meta: ^1.1.8
