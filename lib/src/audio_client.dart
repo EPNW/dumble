@@ -11,8 +11,12 @@ import 'listeners.dart';
 import 'model/audio.dart';
 import 'udp_transport.dart';
 
+/// An AudioFrame contains encoded audio data and optional positional information.
 class AudioFrame with JsonString {
+  /// The frame data, encoded according to mumbles frame [specification](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html).
   final Uint8List frame;
+
+  /// Optional positional information for this frame.
   final PositionalInformation positionalInformation;
   const AudioFrame({@required this.frame, this.positionalInformation});
 
@@ -22,6 +26,7 @@ class AudioFrame with JsonString {
     ..['position'] = positionalInformation.toString();
 }
 
+/// The client responsible for transmitting audio streams.
 abstract class AudioClient with Notifier<AudioListener> {
   static int _sequenceNumber = 1;
 
@@ -35,14 +40,33 @@ abstract class AudioClient with Notifier<AudioListener> {
     return first;
   }
 
+  /// If this client should use udp.
   final bool shouldUseUdp;
+
+  /// The udp latency.
   Duration get udpLatency;
+
+  /// If audio is currently transmitted using udp. If this is false, tcp transport is used.
+  ///
+  /// This can only be `true` if [shouldUseUdp] is set.
+  /// There are variouse reasons why udp is not used even if [shouldUseUdp], e.g.
+  /// the servers udp heartbeats are not receieved or the nonce is currently out of sync.
+  ///
+  /// The value of this field may change over time. For example when switching back to udp after using tcp.
   bool get udpCurrentlyAvailable;
 
   AudioClient({@required this.shouldUseUdp});
 
   Future<void> close();
 
+  /// Initiates audio transport.
+  ///
+  /// To whisper a user, register it as voice target first and then pass the targets id to this method.
+  ///
+  /// The required `codec` parameter tells dumble how to formate the data.
+  /// `framesPerPacket` is always forced to `1` when using opus as codec.
+  ///
+  /// See the [Mumble voice data specification](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html) for mor details.
   AudioFrameSink sendAudio(
       {@required AudioCodec codec,
       int voiceTarget: normalTalking,
@@ -109,7 +133,6 @@ class AudioClientBase extends AudioClient {
   }
 
   void _onUdpAvailabilityChange(bool available) {
-    print('UDP: $available'); //TODO
     _udpAvailable = available;
     if (!_udpAvailable) {
       try {
@@ -157,8 +180,7 @@ class AudioClientBase extends AudioClient {
       {@required AudioCodec codec,
       int voiceTarget: normalTalking,
       int framesPerPacket}) {
-    framesPerPacket =
-        framesPerPacket ?? (codec == AudioCodec.opus ? 1 : 3); //TODO Adjust
+    framesPerPacket = codec == AudioCodec.opus ? 1 : framesPerPacket;
     AudioFrameSinkBase sink;
     if (udpCurrentlyAvailable) {
       sink = new AudioFrameSinkBase.udp(
@@ -175,9 +197,14 @@ class AudioClientBase extends AudioClient {
 
 typedef void AudioErrorCallback(dynamic error, [StackTrace stackTrace]);
 
+/// A sink for [AudioFrame]s that should be transported to the Mumble server.
+///
+/// Use te [onError] callback to receive transport errors.
 abstract class AudioFrameSink extends StreamSink<AudioFrame> {
+  /// Invoked when an audio error occurs
   AudioErrorCallback onError;
 
+  /// The currently used audio codec
   final AudioCodec codec;
 
   AudioFrameSink({@required this.codec, this.onError});
