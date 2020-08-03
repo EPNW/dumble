@@ -310,8 +310,10 @@ class AudioFrameSinkBase extends AudioFrameSink with _UdpErrorReceiver {
 
   @override
   Future close({bool gracefully: true}) async {
-    if (gracefully) _flush(true);
-    _done.complete();
+    if (!(_done?.isCompleted ?? true)) {
+      if (gracefully) _flush(true);
+      _done.complete();
+    }
   }
 
   @override
