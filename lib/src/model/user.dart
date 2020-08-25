@@ -270,18 +270,18 @@ class User with Notifier<UserListener>, JsonString {
   String get name => _name;
   int get userId => _userId;
   Channel get channel => _channel ?? _client.rootChannel;
-  bool get mute => _mute;
-  bool get deaf => _deaf;
-  bool get suppress => _suppress;
-  bool get selfMute => _selfMute;
-  bool get selfDeaf => _selfDeaf;
+  bool get mute => _mute ?? false;
+  bool get deaf => _deaf ?? false;
+  bool get suppress => _suppress ?? false;
+  bool get selfMute => _selfMute ?? false;
+  bool get selfDeaf => _selfDeaf ?? false;
   Uint8List get texture => _texture;
   String get comment => _comment;
   String get hash => _hash;
   Uint8List get commentHash => _commentHash;
   Uint8List get textureHash => _textureHash;
-  bool get prioritySpeaker => _prioritySpeaker;
-  bool get recording => _recording;
+  bool get prioritySpeaker => _prioritySpeaker ?? false;
+  bool get recording => _recording ?? false;
 
   User._(this._client);
 
