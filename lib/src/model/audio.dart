@@ -4,7 +4,7 @@ const int normalTalking = 0;
 
 enum AudioCodec { celtAlpha, celtBeta, speex, opus }
 
-enum TalkMode { normal, whisperToChannel, whisperToUser }
+enum TalkMode { normal, whisperToChannel, whisperToUser, proxyListen }
 
 class PositionalInformation {
   final double x, y, z;
