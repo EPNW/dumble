@@ -110,8 +110,7 @@ void _copy({@required User to, @required User from}) {
 }
 
 @protected
-UserChanges updateUser(
-    {@required User user, Channel channel, @required Proto.UserState state}) {
+UserChanges updateUser({@required User user, Channel channel, @required Proto.UserState state}) {
   if (state.hasSession()) user._session = state.session;
   if (state.hasName()) user._name = state.name;
   if (state.hasUserId()) user._userId = state.userId;
@@ -124,10 +123,8 @@ UserChanges updateUser(
   if (state.hasTexture()) user._texture = new Uint8List.fromList(state.texture);
   if (state.hasComment()) user._comment = state.comment;
   if (state.hasHash()) user._hash = state.hash;
-  if (state.hasCommentHash())
-    user._commentHash = new Uint8List.fromList(state.commentHash);
-  if (state.hasTextureHash())
-    user._textureHash = new Uint8List.fromList(state.textureHash);
+  if (state.hasCommentHash()) user._commentHash = new Uint8List.fromList(state.commentHash);
+  if (state.hasTextureHash()) user._textureHash = new Uint8List.fromList(state.textureHash);
   if (state.hasPrioritySpeaker()) user._prioritySpeaker = state.prioritySpeaker;
   if (state.hasRecording()) user._recording = state.recording;
   return new UserChanges._(
@@ -149,16 +146,12 @@ UserChanges updateUser(
 }
 
 @protected
-void notifyUserUpdate(
-    {@required User user,
-    @required User actor,
-    @required UserChanges changes}) {
+void notifyUserUpdate({@required User user, @required User actor, @required UserChanges changes}) {
   user._notifyUserUpdate(actor: actor, changes: changes);
 }
 
 @protected
-void notifyUserRemoved(
-    {@required User user, @required User actor, String reason, bool ban}) {
+void notifyUserRemoved({@required User user, @required User actor, String reason, bool ban}) {
   user._notifyUserRemoved(actor: actor, reason: reason, ban: ban);
 }
 
@@ -238,6 +231,17 @@ class Selfe extends User {
 
   void setSelfDeaf({@required bool deaf}) =>
       _client.writeMessage(new Proto.UserState()..selfDeaf = deaf);
+
+  void setChannel({@required int channelId}) => _client.writeMessage(new Proto.UserState()
+    ..actor = session
+    ..session = session
+    ..channelId = channelId);
+
+  void setListeningChannelAdd({@required int channelId}) =>
+      _client.writeMessage(new Proto.UserState()..listeningChannelAdd.add(channelId));
+
+  void setListeningChannelRemove({@required int channelId}) =>
+      _client.writeMessage(new Proto.UserState()..listeningChannelRemove.add(channelId));
 }
 
 class User with Notifier<UserListener>, JsonString {
@@ -279,53 +283,45 @@ class User with Notifier<UserListener>, JsonString {
   User._(this._client);
 
   @override
-  Map<String, Object> jsonMap({bool serializeChannel: false}) =>
-      new Map<String, Object>()
-        ..['session'] = session
-        ..['name'] = name
-        ..['userId'] = userId
-        ..['channel'] =
-            (serializeChannel ? channel?.jsonMap() : channel?.channelId)
-        ..['mute'] = mute
-        ..['deaf'] = deaf
-        ..['suppress'] = suppress
-        ..['selfMute'] = selfMute
-        ..['selfDeaf'] = selfDeaf
-        ..['texture'] = texture
-        ..['comment'] = comment
-        ..['hash'] = hash
-        ..['commentHash'] = commentHash
-        ..['textureHash'] = textureHash
-        ..['prioritySpeaker'] = prioritySpeaker
-        ..['recording'] = recording;
+  Map<String, Object> jsonMap({bool serializeChannel: false}) => new Map<String, Object>()
+    ..['session'] = session
+    ..['name'] = name
+    ..['userId'] = userId
+    ..['channel'] = (serializeChannel ? channel?.jsonMap() : channel?.channelId)
+    ..['mute'] = mute
+    ..['deaf'] = deaf
+    ..['suppress'] = suppress
+    ..['selfMute'] = selfMute
+    ..['selfDeaf'] = selfDeaf
+    ..['texture'] = texture
+    ..['comment'] = comment
+    ..['hash'] = hash
+    ..['commentHash'] = commentHash
+    ..['textureHash'] = textureHash
+    ..['prioritySpeaker'] = prioritySpeaker
+    ..['recording'] = recording;
 
-  void _notifyUserUpdate(
-      {@required User actor, @required UserChanges changes}) {
-    listeners.forEach((UserListener listener) =>
-        listener.onUserChanged(this, actor, changes));
+  void _notifyUserUpdate({@required User actor, @required UserChanges changes}) {
+    listeners.forEach((UserListener listener) => listener.onUserChanged(this, actor, changes));
   }
 
   void _notifyUserRemoved({@required User actor, String reason, bool ban}) {
-    listeners.forEach((UserListener listener) =>
-        listener.onUserRemoved(this, actor, reason, ban));
+    listeners.forEach((UserListener listener) => listener.onUserRemoved(this, actor, reason, ban));
   }
 
   void _reportUserStats({@required UserStats stats}) {
-    listeners
-        .forEach((UserListener listener) => listener.onUserStats(this, stats));
+    listeners.forEach((UserListener listener) => listener.onUserStats(this, stats));
   }
 
-  void setPrioritySpeaker({@required bool prioritySpeaker}) => _client
-      .writeMessage(new Proto.UserState()..prioritySpeaker = prioritySpeaker);
+  void setPrioritySpeaker({@required bool prioritySpeaker}) =>
+      _client.writeMessage(new Proto.UserState()..prioritySpeaker = prioritySpeaker);
 
   void setSuppress({@required bool suppress}) =>
       _client.writeMessage(new Proto.UserState()..suppress = suppress);
 
-  void setMute({@required bool mute}) =>
-      _client.writeMessage(new Proto.UserState()..mute = mute);
+  void setMute({@required bool mute}) => _client.writeMessage(new Proto.UserState()..mute = mute);
 
-  void setDeaf({@required bool deaf}) =>
-      _client.writeMessage(new Proto.UserState()..deaf = deaf);
+  void setDeaf({@required bool deaf}) => _client.writeMessage(new Proto.UserState()..deaf = deaf);
 
   void kickUser({String reason}) => _client.writeMessage(new Proto.UserRemove()
     ..reason = reason
@@ -337,26 +333,24 @@ class User with Notifier<UserListener>, JsonString {
     ..ban = true
     ..session = session);
 
-  void requestUserStats({bool statsOnly: false}) =>
-      _client.writeMessage(new Proto.UserStats()
-        ..session = session
-        ..statsOnly = statsOnly);
+  void requestUserStats({bool statsOnly: false}) => _client.writeMessage(new Proto.UserStats()
+    ..session = session
+    ..statsOnly = statsOnly);
 
-  void requestUserTexture() => _client
-      .writeMessage(new Proto.RequestBlob()..sessionTexture.add(session));
+  void requestUserTexture() =>
+      _client.writeMessage(new Proto.RequestBlob()..sessionTexture.add(session));
 
-  void requestUserComment() => _client
-      .writeMessage(new Proto.RequestBlob()..sessionComment.add(session));
+  void requestUserComment() =>
+      _client.writeMessage(new Proto.RequestBlob()..sessionComment.add(session));
 
   void sendMessageToUser({@required String message}) => _client.sendMessage(
-      message:
-          new TextMessage.outgoing(message: message, clients: <User>[this]));
+      message: new TextMessage.outgoing(message: message, clients: <User>[this]));
 
-  void registerAsVoiceTarget({@required int id}) => _client.registerVoiceTarget(
-      target: new VoiceTarget(id: id)..withUser(user: this));
+  void registerAsVoiceTarget({@required int id}) =>
+      _client.registerVoiceTarget(target: new VoiceTarget(id: id)..withUser(user: this));
 
-  void moveToChannel({@required Channel channel}) => _client
-      .writeMessage(new Proto.UserState()..channelId = channel.channelId);
+  void moveToChannel({@required Channel channel}) =>
+      _client.writeMessage(new Proto.UserState()..channelId = channel.channelId);
 
   void registerUser() => _client.writeMessage(new Proto.UserState()
     ..userId = 0
@@ -398,24 +392,23 @@ class UserStats with JsonString {
   ///If withCertificates is true and the stats contain certificates, they are printed in binary.
   ///If withCertificates is false and the stats contain certificates, their count is printed.
   @override
-  Map<String, Object> jsonMap({bool withCertificates: false}) =>
-      new Map<String, Object>()
-        ..['certificates'] = (withCertificates
-            ? certificates?.map((Uint8List bytes) => base64.encode)
-            : certificates?.length)
-        ..['fromClient'] = fromClient?.jsonMap()
-        ..['fromServer'] = fromServer?.jsonMap()
-        ..['udpPacketCount'] = udpPacketCount
-        ..['tcpPacketCount'] = tcpPacketCount
-        ..['pingStats'] = pingStats?.jsonMap()
-        ..['clientVersion'] = clientVersion?.jsonMap()
-        ..['celtVersions'] = celtVersions
-        ..['address'] = address?.toString()
-        ..['bandwidth'] = bandwidth
-        ..['onlineTime'] = onlineTime?.toString()
-        ..['idleTime'] = idleTime?.toString()
-        ..['strongCertificate'] = strongCertificate
-        ..['opus'] = opus;
+  Map<String, Object> jsonMap({bool withCertificates: false}) => new Map<String, Object>()
+    ..['certificates'] = (withCertificates
+        ? certificates?.map((Uint8List bytes) => base64.encode)
+        : certificates?.length)
+    ..['fromClient'] = fromClient?.jsonMap()
+    ..['fromServer'] = fromServer?.jsonMap()
+    ..['udpPacketCount'] = udpPacketCount
+    ..['tcpPacketCount'] = tcpPacketCount
+    ..['pingStats'] = pingStats?.jsonMap()
+    ..['clientVersion'] = clientVersion?.jsonMap()
+    ..['celtVersions'] = celtVersions
+    ..['address'] = address?.toString()
+    ..['bandwidth'] = bandwidth
+    ..['onlineTime'] = onlineTime?.toString()
+    ..['idleTime'] = idleTime?.toString()
+    ..['strongCertificate'] = strongCertificate
+    ..['opus'] = opus;
 }
 
 @protected
@@ -423,9 +416,8 @@ RegisteredUser createRegisteredUser(Proto.UserList_User user, Channel channel) {
   return new RegisteredUser._(
       userId: user.userId,
       name: user.name,
-      lastSeen: user.hasLastSeen() && user.lastSeen.isNotEmpty
-          ? DateTime.parse(user.lastSeen)
-          : null,
+      lastSeen:
+          user.hasLastSeen() && user.lastSeen.isNotEmpty ? DateTime.parse(user.lastSeen) : null,
       lastChannel: channel);
 }
 
@@ -442,12 +434,9 @@ class RegisteredUser with JsonString {
       @required this.lastChannel});
 
   @override
-  Map<String, Object> jsonMap({bool serializeChannel: false}) =>
-      new Map<String, Object>()
-        ..['lastSeen'] = lastSeen.toIso8601String()
-        ..['name'] = name
-        ..['userId'] = userId
-        ..['channel'] = (serializeChannel
-            ? lastChannel?.jsonMap()
-            : lastChannel?.channelId);
+  Map<String, Object> jsonMap({bool serializeChannel: false}) => new Map<String, Object>()
+    ..['lastSeen'] = lastSeen.toIso8601String()
+    ..['name'] = name
+    ..['userId'] = userId
+    ..['channel'] = (serializeChannel ? lastChannel?.jsonMap() : lastChannel?.channelId);
 }
