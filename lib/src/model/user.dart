@@ -262,7 +262,7 @@ class User with Notifier<UserListener>, JsonString {
   int get session => _session;
   String get name => _name;
   int get userId => _userId;
-  Channel get channel => _channel;
+  Channel get channel => _channel ?? _client.rootChannel;
   bool get mute => _mute;
   bool get deaf => _deaf;
   bool get suppress => _suppress;
@@ -285,7 +285,7 @@ class User with Notifier<UserListener>, JsonString {
         ..['name'] = name
         ..['userId'] = userId
         ..['channel'] =
-            (serializeChannel ? channel.jsonMap() : channel.channelId)
+            (serializeChannel ? channel?.jsonMap() : channel?.channelId)
         ..['mute'] = mute
         ..['deaf'] = deaf
         ..['suppress'] = suppress

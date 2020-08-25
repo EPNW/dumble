@@ -1,12 +1,9 @@
 /*
 TODO:
 ACL Stuff
-
-Write Documentation
-
-Intensive testing
 */
 
+/// A Mumble transport client framework
 library dumble;
 
 export 'src/model/audio.dart';
@@ -26,6 +23,7 @@ export 'src/model/channel.dart'
         updateChannel,
         notifyChannelUpdate,
         linksChanged,
+        notifyChannelRemoved,
         notifyChannelPermissions;
 export 'src/model/misc.dart'
     hide serializeVoiceTarget, serializeBanEntry, banEntryFromProto;
