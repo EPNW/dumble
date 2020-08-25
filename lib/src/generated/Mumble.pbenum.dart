@@ -1,6 +1,6 @@
 ///
 //  Generated code. Do not modify.
-//  source: Mumble.proto
+//  source: mumble.proto
 //
 // @dart = 2.3
 // ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
@@ -50,6 +50,9 @@ class PermissionDenied_DenyType extends $pb.ProtobufEnum {
   static const PermissionDenied_DenyType UserName = PermissionDenied_DenyType._(8, 'UserName');
   static const PermissionDenied_DenyType ChannelFull = PermissionDenied_DenyType._(9, 'ChannelFull');
   static const PermissionDenied_DenyType NestingLimit = PermissionDenied_DenyType._(10, 'NestingLimit');
+  static const PermissionDenied_DenyType ChannelCountLimit = PermissionDenied_DenyType._(11, 'ChannelCountLimit');
+  static const PermissionDenied_DenyType ChannelListenerLimit = PermissionDenied_DenyType._(12, 'ChannelListenerLimit');
+  static const PermissionDenied_DenyType UserListenerLimit = PermissionDenied_DenyType._(13, 'UserListenerLimit');
 
   static const $core.List<PermissionDenied_DenyType> values = <PermissionDenied_DenyType> [
     Text,
@@ -63,6 +66,9 @@ class PermissionDenied_DenyType extends $pb.ProtobufEnum {
     UserName,
     ChannelFull,
     NestingLimit,
+    ChannelCountLimit,
+    ChannelListenerLimit,
+    UserListenerLimit,
   ];
 
   static final $core.Map<$core.int, PermissionDenied_DenyType> _byValue = $pb.ProtobufEnum.initByValue(values);

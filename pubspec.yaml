@@ -10,4 +10,4 @@ dependencies:
   convert: ^2.1.1
 dev_dependencies:
   opus_dart:
-    path: ../opus_dart
+    git: https://github.com/EPNW/opus_dart

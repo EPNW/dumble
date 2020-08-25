@@ -1,6 +1,6 @@
 ///
 //  Generated code. Do not modify.
-//  source: Mumble.proto
+//  source: mumble.proto
 //
 // @dart = 2.3
 // ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
@@ -10,9 +10,9 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'Mumble.pbenum.dart';
+import 'mumble.pbenum.dart';
 
-export 'Mumble.pbenum.dart';
+export 'mumble.pbenum.dart';
 
 class Version extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo('Version', package: const $pb.PackageName('MumbleProto'), createEmptyInstance: create)
@@ -440,6 +440,8 @@ class ChannelState extends $pb.GeneratedMessage {
     ..a<$core.int>(9, 'position', $pb.PbFieldType.O3)
     ..a<$core.List<$core.int>>(10, 'descriptionHash', $pb.PbFieldType.OY)
     ..a<$core.int>(11, 'maxUsers', $pb.PbFieldType.OU3)
+    ..aOB(12, 'isEnterRestricted')
+    ..aOB(13, 'canEnter')
     ..hasRequiredFields = false
   ;
 
@@ -538,6 +540,24 @@ class ChannelState extends $pb.GeneratedMessage {
   $core.bool hasMaxUsers() => $_has(10);
   @$pb.TagNumber(11)
   void clearMaxUsers() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.bool get isEnterRestricted => $_getBF(11);
+  @$pb.TagNumber(12)
+  set isEnterRestricted($core.bool v) { $_setBool(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasIsEnterRestricted() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearIsEnterRestricted() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.bool get canEnter => $_getBF(12);
+  @$pb.TagNumber(13)
+  set canEnter($core.bool v) { $_setBool(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasCanEnter() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearCanEnter() => clearField(13);
 }
 
 class UserRemove extends $pb.GeneratedMessage {
@@ -621,6 +641,9 @@ class UserState extends $pb.GeneratedMessage {
     ..a<$core.List<$core.int>>(17, 'textureHash', $pb.PbFieldType.OY)
     ..aOB(18, 'prioritySpeaker')
     ..aOB(19, 'recording')
+    ..pPS(20, 'temporaryAccessTokens')
+    ..p<$core.int>(21, 'listeningChannelAdd', $pb.PbFieldType.PU3)
+    ..p<$core.int>(22, 'listeningChannelRemove', $pb.PbFieldType.PU3)
     ..hasRequiredFields = false
   ;
 
@@ -809,6 +832,15 @@ class UserState extends $pb.GeneratedMessage {
   $core.bool hasRecording() => $_has(18);
   @$pb.TagNumber(19)
   void clearRecording() => clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.List<$core.String> get temporaryAccessTokens => $_getList(19);
+
+  @$pb.TagNumber(21)
+  $core.List<$core.int> get listeningChannelAdd => $_getList(20);
+
+  @$pb.TagNumber(22)
+  $core.List<$core.int> get listeningChannelRemove => $_getList(21);
 }
 
 class BanList_BanEntry extends $pb.GeneratedMessage {

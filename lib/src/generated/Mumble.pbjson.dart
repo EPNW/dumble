@@ -1,6 +1,6 @@
 ///
 //  Generated code. Do not modify.
-//  source: Mumble.proto
+//  source: mumble.proto
 //
 // @dart = 2.3
 // ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
@@ -105,6 +105,8 @@ const ChannelState$json = const {
     const {'1': 'position', '3': 9, '4': 1, '5': 5, '7': '0', '10': 'position'},
     const {'1': 'description_hash', '3': 10, '4': 1, '5': 12, '10': 'descriptionHash'},
     const {'1': 'max_users', '3': 11, '4': 1, '5': 13, '10': 'maxUsers'},
+    const {'1': 'is_enter_restricted', '3': 12, '4': 1, '5': 8, '10': 'isEnterRestricted'},
+    const {'1': 'can_enter', '3': 13, '4': 1, '5': 8, '10': 'canEnter'},
   ],
 };
 
@@ -140,6 +142,9 @@ const UserState$json = const {
     const {'1': 'texture_hash', '3': 17, '4': 1, '5': 12, '10': 'textureHash'},
     const {'1': 'priority_speaker', '3': 18, '4': 1, '5': 8, '10': 'prioritySpeaker'},
     const {'1': 'recording', '3': 19, '4': 1, '5': 8, '10': 'recording'},
+    const {'1': 'temporary_access_tokens', '3': 20, '4': 3, '5': 9, '10': 'temporaryAccessTokens'},
+    const {'1': 'listening_channel_add', '3': 21, '4': 3, '5': 13, '10': 'listeningChannelAdd'},
+    const {'1': 'listening_channel_remove', '3': 22, '4': 3, '5': 13, '10': 'listeningChannelRemove'},
   ],
 };
 
@@ -203,6 +208,9 @@ const PermissionDenied_DenyType$json = const {
     const {'1': 'UserName', '2': 8},
     const {'1': 'ChannelFull', '2': 9},
     const {'1': 'NestingLimit', '2': 10},
+    const {'1': 'ChannelCountLimit', '2': 11},
+    const {'1': 'ChannelListenerLimit', '2': 12},
+    const {'1': 'UserListenerLimit', '2': 13},
   ],
 };
 
