@@ -1,5 +1,5 @@
 name: dumble
-version: 0.7.1
+version: 0.7.2
 author: EPNW <prokopwieler.hardundsoftware@gmail.com>
 description: A Mumble transport client framework supporting multiple Mumble features such as fully encrypted udp transport or user management.
 homepage: https://github.com/EPNW/dumble
