@@ -413,7 +413,7 @@ class VersionInformation with JsonString {
 
 @protected
 Proto.VoiceTarget serializeVoiceTarget(VoiceTarget voiceTarget) {
-  Proto.VoiceTarget target = new Proto.VoiceTarget();
+  Proto.VoiceTarget target = new Proto.VoiceTarget()..id = voiceTarget.id;
   target.targets.add(new Proto.VoiceTarget_Target()
     ..session.addAll(voiceTarget._users.map((User u) => u.session)));
   for (int i = 0; i < voiceTarget._channels.length; i++) {
