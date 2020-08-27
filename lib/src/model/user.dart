@@ -239,12 +239,17 @@ class Selfe extends User {
   void setSelfDeaf({@required bool deaf}) =>
       _client.writeMessage(new Proto.UserState()..selfDeaf = deaf);
 
-  void addListeningChannel({@required Channel channel}) => _client.writeMessage(
-      new Proto.UserState()..listeningChannelAdd.add(channel.channelId));
+  void addListeningChannel({@required Channel channel}) =>
+      _client.writeMessage(new Proto.UserState()
+        ..listeningChannelAdd.add(channel.channelId)
+        ..actor = session
+        ..session = session);
 
   void removeListeningChannel({@required Channel channel}) =>
-      _client.writeMessage(
-          new Proto.UserState()..listeningChannelRemove.add(channel.channelId));
+      _client.writeMessage(new Proto.UserState()
+        ..listeningChannelRemove.add(channel.channelId)
+        ..actor = session
+        ..session = session);
 }
 
 class User with Notifier<UserListener>, JsonString {
