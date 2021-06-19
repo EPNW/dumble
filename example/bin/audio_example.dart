@@ -4,20 +4,23 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:math';
 import 'package:dumble/dumble.dart';
+import 'package:dumble_examples/connection_options.dart';
 import 'package:opus_dart/opus_dart.dart';
 
 Future<void> main() async {
-  // We are going to use opus so init it
-  initOpus(new DynamicLibrary.open(
-      'libopus_x64.dll')); // Put in your own opus path here
+  // We are going to use opus_dart so init it
+  // Put in your own opus path here
+  // Quick note on casting to dynamic: since opus_dart supports web as of version
+  // 3.0.0, this cast may be necessary if your IDE analyzer gives a warning.
+  // At runtime, types will match.
+  initOpus(new DynamicLibrary.open('libopus_x64.dll') as dynamic);
   //Connect to a mumble server
-  ConnectionOptions options =
-      new ConnectionOptions(host: 'localhost', port: 64738, name: 'Dumble');
-  MumbleClient client = new MumbleClient(options: options);
-  await client.connect(onBadCertificate: (X509Certificate certificate) {
-    //Accept every certificate
-    return true;
-  });
+  MumbleClient client = await MumbleClient.connect(
+      options: defaulConnectionOptions,
+      onBadCertificate: (X509Certificate certificate) {
+        //Accept every certificate
+        return true;
+      });
   client.audio.add(new SaveToFileAudioListener());
   await new Future.delayed(
       const Duration(seconds: 5)); // Wait a few seconds before we start talking
@@ -31,7 +34,8 @@ Future<void> main() async {
   await simulateAudioRecording() // This simulates recording by reading from a file
       .asyncMap((List<int> bytes) async {
         // We need to wait a bit since reading from a file is "faster than realtime".
-        // Usually we would wait frameTimeMs, but since encoding with opus takes about 17ms, we wait less.
+        // Usually we would wait frameTimeMs, but since encoding with opus takes about abit
+        // (we assume 17ms here), we wait less.
         // In an actual live recording, you dont need this artificial waiting.
         await new Future.delayed(
             const Duration(milliseconds: frameTimeMs - 17));
@@ -55,9 +59,10 @@ Stream<List<int>> simulateAudioRecording() async* {
       frameTimeMs *
       channels *
       2; //2 because s16le takes two bytes per sample
-  Uint8List buffer;
+  Uint8List? buffer;
   int bufferIndex = 0;
-  await for (Uint8List bytes in new File('0_8000_1_s16le.raw').openRead()) {
+  await for (Uint8List bytes
+      in new File('./assets/0_8000_1_s16le.raw').openRead().cast<Uint8List>()) {
     int consumed = 0;
     while (consumed < bytes.length) {
       if (buffer == null && frameByteSize <= (bytes.length - consumed)) {
@@ -82,19 +87,19 @@ Stream<List<int>> simulateAudioRecording() async* {
 
 class SaveToFileAudioListener with AudioListener {
   SaveToFileAudioListener() {
-    new Directory('./recordings').create(recursive: true);
+    new Directory('./recordings').createSync(recursive: true);
   }
 
   @override
   void onAudioReceived(Stream<AudioFrame> voiceData, AudioCodec codec,
-      User speaker, TalkMode talkMode) {
+      User? speaker, TalkMode talkMode) {
     String target = talkMode == TalkMode.normal
-        ? 'talking to ${speaker.channel.name}'
+        ? 'talking to ${speaker?.channel.channelId}'
         : ' whispering';
-    print('${speaker.name} started ${target}.');
+    print('${speaker?.name} started ${target}.');
     if (codec == AudioCodec.opus) {
       File targetFile = new File(
-          './recordings/${speaker.name}_${new DateTime.now().millisecondsSinceEpoch}_.wav');
+          './recordings/${speaker?.name}_${new DateTime.now().millisecondsSinceEpoch}_.wav');
       IOSink output = targetFile.openWrite();
       output.write(
           new Uint8List(wavHeaderSize)); // Reserve space for a wav header
@@ -104,13 +109,14 @@ class SaveToFileAudioListener with AudioListener {
       voiceData
           .map<Uint8List>((AudioFrame frame) =>
               frame.frame) //we are only interested in the bytes
+          .cast<Uint8List?>()
           .transform(decoder)
           .cast<List<int>>()
           .pipe(output)
           .then((_) async {
         await output.close();
         await writeWavHeader(targetFile);
-        print('${speaker.name} stopped ${target}.');
+        print('${speaker?.name} stopped ${target}.');
       });
     } else {
       print('But we don\'t know how do decode $codec');
@@ -129,7 +135,8 @@ Future<void> writeWavHeader(File file) async {
       fileSize: await file.length()));
 }
 
-Uint8List wavHeader({int sampleRate, int channels, int fileSize}) {
+Uint8List wavHeader(
+    {required int sampleRate, required int channels, required int fileSize}) {
   const int sampleBits = 16; //We know this since we used opus
   const Endian endian = Endian.little;
   final int frameSize = ((sampleBits + 7) ~/ 8) * channels;

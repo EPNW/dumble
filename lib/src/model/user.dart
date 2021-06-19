@@ -1,97 +1,30 @@
 import 'dart:typed_data';
-import 'dart:convert' show base64;
 import '../client_base.dart';
 import '../listeners.dart';
 import 'package:meta/meta.dart';
 import '../generated/Mumble.pb.dart' as Proto;
 import 'channel.dart';
-import 'misc.dart';
-import '../utils.dart' show JsonString, ByteAddress;
-import 'dart:io' show InternetAddress;
+import 'voice_target.dart';
+import '../utils.dart' show JsonString;
+import 'user_stats.dart';
+import 'text_message.dart';
 
 @protected
-User createNewUser({@required MumbleClientBase client}) {
-  return new User._(client);
+User createNewUser(
+    {required int sessionId,
+    required MumbleClientBase client,
+    required Channel channel}) {
+  return new User._(sessionId, client, channel);
 }
 
 @protected
-UserStats createUserStats({@required Proto.UserStats stats}) {
-  InternetAddress address;
-  if (stats.hasAddress() &&
-      stats.address != null &&
-      (stats.address.length == 4 || stats.address.length == 16)) {
-    address = ByteAddress.fromBytes(stats.address, asIPv4IfPossible: true);
-  }
-
-  VersionInformation info;
-  Proto.Version version = stats.hasVersion() ? stats.version : null;
-  if (version != null) {
-    info = new VersionInformation(
-        os: version.os,
-        osVersion: version.osVersion,
-        release: version.release,
-        version: version.version);
-  }
-
-  PacketStats fromServer;
-  if (stats.hasFromServer() && stats.fromServer != null) {
-    fromServer = new PacketStats(
-        goodPacketCount: stats.fromServer.good,
-        latePacketCount: stats.fromServer.late,
-        lostPacketCount: stats.fromServer.lost,
-        resync: stats.fromServer.resync);
-  }
-
-  PacketStats fromClient;
-  if (stats.hasFromClient() && stats.fromClient != null) {
-    fromClient = new PacketStats(
-        goodPacketCount: stats.fromClient.good,
-        latePacketCount: stats.fromClient.late,
-        lostPacketCount: stats.fromClient.lost,
-        resync: stats.fromClient.resync);
-  }
-
-  PingStats pingStats = new PingStats(
-      tcpPingAverage: stats.tcpPingAvg,
-      tcpPingVariance: stats.tcpPingVar,
-      udpPingAverage: stats.udpPingAvg,
-      udpPingVariance: stats.udpPingVar);
-
-  List<Uint8List> certificates = new List<Uint8List>();
-  for (List<int> cert in stats.certificates) {
-    certificates.add(new Uint8List.fromList(cert));
-  }
-
-  return new UserStats(
-      certificates: certificates.isNotEmpty ? certificates : null,
-      pingStats: pingStats,
-      fromClient: fromClient,
-      fromServer: fromServer,
-      clientVersion: info,
-      strongCertificate: stats.strongCertificate,
-      celtVersions: stats.celtVersions,
-      bandwidth: stats.bandwidth,
-      udpPacketCount: stats.udpPackets,
-      tcpPacketCount: stats.tcpPackets,
-      opus: stats.opus,
-      address: address,
-      onlineTime: (stats.hasOnlinesecs() && stats.onlinesecs != null)
-          ? new Duration(seconds: stats.onlinesecs)
-          : null,
-      idleTime: (stats.hasIdlesecs() && stats.idlesecs != null)
-          ? new Duration(seconds: stats.idlesecs)
-          : null);
+Self asSelf({required User user}) {
+  Self self = new Self._(user.session, user._client, user.channel);
+  _copy(to: self, from: user);
+  return self;
 }
 
-@protected
-Selfe asSelfe({@required User user}) {
-  Selfe selfe = new Selfe._(user._client);
-  _copy(to: selfe, from: user);
-  return selfe;
-}
-
-void _copy({@required User to, @required User from}) {
-  to._session = from.session;
+void _copy({required User to, required User from}) {
   to._name = from.name;
   to._userId = from.userId;
   to._channel = from.channel;
@@ -111,8 +44,7 @@ void _copy({@required User to, @required User from}) {
 
 @protected
 UserChanges updateUser(
-    {@required User user, Channel channel, @required Proto.UserState state}) {
-  if (state.hasSession()) user._session = state.session;
+    {required User user, Channel? channel, required Proto.UserState state}) {
   if (state.hasName()) user._name = state.name;
   if (state.hasUserId()) user._userId = state.userId;
   if (channel != null) user._channel = channel;
@@ -150,20 +82,18 @@ UserChanges updateUser(
 
 @protected
 void notifyUserUpdate(
-    {@required User user,
-    @required User actor,
-    @required UserChanges changes}) {
+    {required User user, User? actor, required UserChanges changes}) {
   user._notifyUserUpdate(actor: actor, changes: changes);
 }
 
 @protected
 void notifyUserRemoved(
-    {@required User user, @required User actor, String reason, bool ban}) {
+    {required User user, User? actor, String? reason, bool? ban}) {
   user._notifyUserRemoved(actor: actor, reason: reason, ban: ban);
 }
 
 @protected
-void reportUserStats({@required User user, @required UserStats stats}) {
+void reportUserStats({required User user, required UserStats stats}) {
   user._reportUserStats(stats: stats);
 }
 
@@ -184,21 +114,21 @@ class UserChanges with JsonString {
       prioritySpeaker,
       recording;
   const UserChanges._(
-      {@required this.name,
-      @required this.userId,
-      @required this.channel,
-      @required this.mute,
-      @required this.deaf,
-      @required this.supress,
-      @required this.selfMute,
-      @required this.selfDeaf,
-      @required this.texture,
-      @required this.comment,
-      @required this.hash,
-      @required this.commentHash,
-      @required this.textureHash,
-      @required this.prioritySpeaker,
-      @required this.recording});
+      {required this.name,
+      required this.userId,
+      required this.channel,
+      required this.mute,
+      required this.deaf,
+      required this.supress,
+      required this.selfMute,
+      required this.selfDeaf,
+      required this.texture,
+      required this.comment,
+      required this.hash,
+      required this.commentHash,
+      required this.textureHash,
+      required this.prioritySpeaker,
+      required this.recording});
 
   @override
   Map<String, Object> jsonMap() => new Map<String, Object>()
@@ -219,123 +149,160 @@ class UserChanges with JsonString {
     ..['recording'] = recording;
 }
 
-class Selfe extends User {
-  Selfe._(MumbleClientBase _client) : super._(_client);
+class Self extends User {
+  Self._(int session, MumbleClientBase _client, Channel channel)
+      : super._(session, _client, channel);
 
-  void setComment({@required String comment}) =>
+  void setComment({String? comment}) =>
       _client.writeMessage(new Proto.UserState()..comment = comment ?? '');
 
-  void setTexture({@required Uint8List texture}) {
+  void setTexture({Uint8List? texture}) {
     Proto.UserState state = new Proto.UserState();
-    if (texture != null) {
+    if (texture != null && texture.isNotEmpty) {
       state.texture = texture;
     }
     _client.writeMessage(state);
   }
 
-  void setSelfMute({@required bool mute}) =>
+  void setSelfMute({required bool mute}) =>
       _client.writeMessage(new Proto.UserState()..selfMute = mute);
 
-  void setSelfDeaf({@required bool deaf}) =>
+  void setSelfDeaf({required bool deaf}) =>
       _client.writeMessage(new Proto.UserState()..selfDeaf = deaf);
 }
 
 class User with Notifier<UserListener>, JsonString {
   final MumbleClientBase _client;
-  int _session;
-  String _name;
-  int _userId;
+  final int session;
   Channel _channel;
-  bool _mute;
-  bool _deaf;
-  bool _suppress;
-  bool _selfMute;
-  bool _selfDeaf;
-  Uint8List _texture;
-  String _comment;
-  String _hash;
-  Uint8List _commentHash;
-  Uint8List _textureHash;
-  bool _prioritySpeaker;
-  bool _recording;
+  String? _name;
+  int? _userId;
+  bool? _mute;
+  bool? _deaf;
+  bool? _suppress;
+  bool? _selfMute;
+  bool? _selfDeaf;
+  Uint8List? _texture;
+  String? _comment;
+  String? _hash;
+  Uint8List? _commentHash;
+  Uint8List? _textureHash;
+  bool? _prioritySpeaker;
+  bool? _recording;
 
-  int get session => _session;
-  String get name => _name;
-  int get userId => _userId;
-  Channel get channel => _channel ?? _client.rootChannel;
-  bool get mute => _mute;
-  bool get deaf => _deaf;
-  bool get suppress => _suppress;
-  bool get selfMute => _selfMute;
-  bool get selfDeaf => _selfDeaf;
-  Uint8List get texture => _texture;
-  String get comment => _comment;
-  String get hash => _hash;
-  Uint8List get commentHash => _commentHash;
-  Uint8List get textureHash => _textureHash;
-  bool get prioritySpeaker => _prioritySpeaker;
-  bool get recording => _recording;
+  String? get name => _name;
+  int? get userId => _userId;
+  Channel get channel => _channel;
+  bool? get mute => _mute;
+  bool? get deaf => _deaf;
+  bool? get suppress => _suppress;
+  bool? get selfMute => _selfMute;
+  bool? get selfDeaf => _selfDeaf;
+  Uint8List? get texture => _texture;
+  String? get comment => _comment;
+  String? get hash => _hash;
+  Uint8List? get commentHash => _commentHash;
+  Uint8List? get textureHash => _textureHash;
+  bool? get prioritySpeaker => _prioritySpeaker;
+  bool? get recording => _recording;
 
-  User._(this._client);
+  User._(this.session, this._client, this._channel);
 
   @override
-  Map<String, Object> jsonMap({bool serializeChannel: false}) =>
-      new Map<String, Object>()
-        ..['session'] = session
-        ..['name'] = name
-        ..['userId'] = userId
-        ..['channel'] =
-            (serializeChannel ? channel?.jsonMap() : channel?.channelId)
-        ..['mute'] = mute
-        ..['deaf'] = deaf
-        ..['suppress'] = suppress
-        ..['selfMute'] = selfMute
-        ..['selfDeaf'] = selfDeaf
-        ..['texture'] = texture
-        ..['comment'] = comment
-        ..['hash'] = hash
-        ..['commentHash'] = commentHash
-        ..['textureHash'] = textureHash
-        ..['prioritySpeaker'] = prioritySpeaker
-        ..['recording'] = recording;
+  Map<String, Object> jsonMap({bool serializeChannel: false}) {
+    Map<String, Object> map = new Map<String, Object>()..['session'] = session;
+    if (name != null) {
+      map['name'] = name!;
+    }
+    if (userId != null) {
+      map['userId'] = userId!;
+    }
+    map['channel'] = (serializeChannel ? channel.jsonMap() : channel.channelId);
+    if (mute != null) {
+      map['mute'] = mute!;
+    }
+    if (deaf != null) {
+      map['deaf'] = deaf!;
+    }
+    if (suppress != null) {
+      map['suppress'] = suppress!;
+    }
+    if (selfMute != null) {
+      map['selfMute'] = selfMute!;
+    }
+    if (selfDeaf != null) {
+      map['selfDeaf'] = selfDeaf!;
+    }
+    if (texture != null) {
+      map['texture'] = texture!;
+    }
+    if (comment != null) {
+      map['comment'] = comment!;
+    }
+    if (hash != null) {
+      map['hash'] = hash!;
+    }
+    if (commentHash != null) {
+      map['commentHash'] = commentHash!;
+    }
+    if (textureHash != null) {
+      map['textureHash'] = textureHash!;
+    }
+    if (prioritySpeaker != null) {
+      map['prioritySpeaker'] = prioritySpeaker!;
+    }
+    if (recording != null) {
+      map['recording'] = recording!;
+    }
+    return map;
+  }
 
-  void _notifyUserUpdate(
-      {@required User actor, @required UserChanges changes}) {
+  void _notifyUserUpdate({User? actor, required UserChanges changes}) {
     listeners.forEach((UserListener listener) =>
         listener.onUserChanged(this, actor, changes));
   }
 
-  void _notifyUserRemoved({@required User actor, String reason, bool ban}) {
+  void _notifyUserRemoved({User? actor, String? reason, bool? ban}) {
     listeners.forEach((UserListener listener) =>
         listener.onUserRemoved(this, actor, reason, ban));
   }
 
-  void _reportUserStats({@required UserStats stats}) {
+  void _reportUserStats({required UserStats stats}) {
     listeners
         .forEach((UserListener listener) => listener.onUserStats(this, stats));
   }
 
-  void setPrioritySpeaker({@required bool prioritySpeaker}) => _client
+  void setPrioritySpeaker({required bool prioritySpeaker}) => _client
       .writeMessage(new Proto.UserState()..prioritySpeaker = prioritySpeaker);
 
-  void setSuppress({@required bool suppress}) =>
+  void setSuppress({required bool suppress}) =>
       _client.writeMessage(new Proto.UserState()..suppress = suppress);
 
-  void setMute({@required bool mute}) =>
+  void setMute({required bool mute}) =>
       _client.writeMessage(new Proto.UserState()..mute = mute);
 
-  void setDeaf({@required bool deaf}) =>
+  void setDeaf({required bool deaf}) =>
       _client.writeMessage(new Proto.UserState()..deaf = deaf);
 
-  void kickUser({String reason}) => _client.writeMessage(new Proto.UserRemove()
-    ..reason = reason
-    ..ban = false
-    ..session = session);
+  void kickUser({String? reason}) {
+    Proto.UserRemove msg = new Proto.UserRemove()
+      ..ban = false
+      ..session = session;
+    if (reason != null) {
+      msg.reason = reason;
+    }
+    _client.writeMessage(msg);
+  }
 
-  void banUser({String reason}) => _client.writeMessage(new Proto.UserRemove()
-    ..reason = reason
-    ..ban = true
-    ..session = session);
+  void banUser({String? reason}) {
+    Proto.UserRemove msg = new Proto.UserRemove()
+      ..ban = true
+      ..session = session;
+    if (reason != null) {
+      msg.reason = reason;
+    }
+    _client.writeMessage(msg);
+  }
 
   void requestUserStats({bool statsOnly: false}) =>
       _client.writeMessage(new Proto.UserStats()
@@ -348,106 +315,47 @@ class User with Notifier<UserListener>, JsonString {
   void requestUserComment() => _client
       .writeMessage(new Proto.RequestBlob()..sessionComment.add(session));
 
-  void sendMessageToUser({@required String message}) => _client.sendMessage(
+  void sendMessageToUser({required String message}) => _client.sendMessage(
       message:
-          new TextMessage.outgoing(message: message, clients: <User>[this]));
+          new OutgoingTextMessage(message: message, clients: <User>[this]));
 
-  void registerAsVoiceTarget({@required int id}) => _client.registerVoiceTarget(
+  void registerAsVoiceTarget({required int id}) => _client.registerVoiceTarget(
       target: new VoiceTarget(id: id)..withUser(user: this));
 
-  void moveToChannel({@required Channel channel}) => _client
-      .writeMessage(new Proto.UserState()..channelId = channel.channelId);
+  void moveToChannel(
+      {required Channel channel, List<String>? temporaryAccessTokens}) {
+    Proto.UserState msg = new Proto.UserState();
+    msg.channelId = channel.channelId;
+    msg.session = session;
+    if (temporaryAccessTokens != null) {
+      msg.temporaryAccessTokens.addAll(temporaryAccessTokens);
+    }
+    _client.writeMessage(msg);
+  }
+
+  void addListeingChannels(
+      {required List<Channel> channels, List<String>? temporaryAccessTokens}) {
+    Proto.UserState msg = new Proto.UserState();
+    msg.listeningChannelAdd.addAll(channels.map((Channel c) => c.channelId));
+    msg.session = session;
+    if (temporaryAccessTokens != null) {
+      msg.temporaryAccessTokens.addAll(temporaryAccessTokens);
+    }
+    _client.writeMessage(msg);
+  }
+
+  void removeListeingChannels(
+      {required List<Channel> channels, List<String>? temporaryAccessTokens}) {
+    Proto.UserState msg = new Proto.UserState();
+    msg.listeningChannelRemove.addAll(channels.map((Channel c) => c.channelId));
+    msg.session = session;
+    if (temporaryAccessTokens != null) {
+      msg.temporaryAccessTokens.addAll(temporaryAccessTokens);
+    }
+    _client.writeMessage(msg);
+  }
 
   void registerUser() => _client.writeMessage(new Proto.UserState()
     ..userId = 0
     ..session = session);
-}
-
-class UserStats with JsonString {
-  final List<Uint8List> certificates;
-  final PacketStats fromClient;
-  final PacketStats fromServer;
-  final int udpPacketCount;
-  final int tcpPacketCount;
-  final PingStats pingStats;
-  final VersionInformation clientVersion;
-  final List<int> celtVersions;
-  final InternetAddress address;
-  final int bandwidth;
-  final Duration onlineTime;
-  final Duration idleTime;
-  final bool strongCertificate;
-  final bool opus;
-
-  const UserStats(
-      {this.certificates,
-      this.fromClient,
-      this.fromServer,
-      this.udpPacketCount,
-      this.tcpPacketCount,
-      this.pingStats,
-      this.clientVersion,
-      this.celtVersions,
-      this.address,
-      this.bandwidth,
-      this.onlineTime,
-      this.idleTime,
-      this.strongCertificate,
-      this.opus});
-
-  ///If withCertificates is true and the stats contain certificates, they are printed in binary.
-  ///If withCertificates is false and the stats contain certificates, their count is printed.
-  @override
-  Map<String, Object> jsonMap({bool withCertificates: false}) =>
-      new Map<String, Object>()
-        ..['certificates'] = (withCertificates
-            ? certificates?.map((Uint8List bytes) => base64.encode)
-            : certificates?.length)
-        ..['fromClient'] = fromClient?.jsonMap()
-        ..['fromServer'] = fromServer?.jsonMap()
-        ..['udpPacketCount'] = udpPacketCount
-        ..['tcpPacketCount'] = tcpPacketCount
-        ..['pingStats'] = pingStats?.jsonMap()
-        ..['clientVersion'] = clientVersion?.jsonMap()
-        ..['celtVersions'] = celtVersions
-        ..['address'] = address?.toString()
-        ..['bandwidth'] = bandwidth
-        ..['onlineTime'] = onlineTime?.toString()
-        ..['idleTime'] = idleTime?.toString()
-        ..['strongCertificate'] = strongCertificate
-        ..['opus'] = opus;
-}
-
-@protected
-RegisteredUser createRegisteredUser(Proto.UserList_User user, Channel channel) {
-  return new RegisteredUser._(
-      userId: user.userId,
-      name: user.name,
-      lastSeen: user.hasLastSeen() && user.lastSeen.isNotEmpty
-          ? DateTime.parse(user.lastSeen)
-          : null,
-      lastChannel: channel);
-}
-
-class RegisteredUser with JsonString {
-  final int userId;
-  final String name;
-  final DateTime lastSeen;
-  final Channel lastChannel;
-
-  const RegisteredUser._(
-      {@required this.userId,
-      @required this.name,
-      @required this.lastSeen,
-      @required this.lastChannel});
-
-  @override
-  Map<String, Object> jsonMap({bool serializeChannel: false}) =>
-      new Map<String, Object>()
-        ..['lastSeen'] = lastSeen.toIso8601String()
-        ..['name'] = name
-        ..['userId'] = userId
-        ..['channel'] = (serializeChannel
-            ? lastChannel?.jsonMap()
-            : lastChannel?.channelId);
 }

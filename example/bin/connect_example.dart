@@ -1,27 +1,31 @@
 import 'dart:io';
 
 import 'package:dumble/dumble.dart';
+import 'package:dumble_examples/connection_options.dart';
 
 Future<void> main() async {
-  ConnectionOptions options =
-      new ConnectionOptions(host: 'localhost', port: 64738, name: 'Dumble');
-  MumbleClient client = new MumbleClient(options: options);
-  // Add a callback to the client
-  client.add(new MumbleCallback(client));
-  await client.connect(onBadCertificate: (X509Certificate certificate) {
-    //Accept every certificate
-    return true;
-  });
+  MumbleClient client = await MumbleClient.connect(
+      options: defaulConnectionOptions,
+      onBadCertificate: (X509Certificate certificate) {
+        //Accept every certificate
+        return true;
+      });
+  client.add(new MumbleExampleCallback(client));
+  print('Client synced with server!');
+  print('Listing channels...');
+  print(client.getChannels());
+  print('Listing users...');
+  print(client.getUsers());
   // Set a comment for us
-  client.selfe.setComment(comment: 'I\'m a bot!');
+  client.self.setComment(comment: 'I\'m a bot!');
 // Create a channel. If the channel is succesfully created, our callback is invoked.
   client.createChannel(name: 'Dumble Test Channel');
 }
 
-class MumbleCallback with MumbleClientListener, UserListener {
+class MumbleExampleCallback with MumbleClientListener, UserListener {
   final MumbleClient client;
 
-  const MumbleCallback(this.client);
+  const MumbleExampleCallback(this.client);
 
   @override
   void onBanListReceived(List<BanEntry> bans) {}
@@ -31,7 +35,7 @@ class MumbleCallback with MumbleClientListener, UserListener {
     if (channel.name == 'Dumble Test Channel') {
       // This is our channel
       // join it
-      client.selfe.moveToChannel(channel: channel);
+      client.self.moveToChannel(channel: channel);
     }
   }
 
@@ -45,7 +49,7 @@ class MumbleCallback with MumbleClientListener, UserListener {
   void onDropAllChannelPermissions() {}
 
   @override
-  void onError(error, [StackTrace stackTrace]) {
+  void onError(error, [StackTrace? stackTrace]) {
     throw error;
   }
 
@@ -53,17 +57,8 @@ class MumbleCallback with MumbleClientListener, UserListener {
   void onQueryUsersResult(Map<int, String> idToName) {}
 
   @override
-  void onSynced() {
-    print('Client synced with server!');
-    print('Listing channels...');
-    print(client.getChannels());
-    print('Listing users...');
-    print(client.getUsers());
-  }
-
-  @override
-  void onTextMessage(TextMessage message) {
-    print('[${new DateTime.now()}] ${message.actor.name}: ${message.message}');
+  void onTextMessage(IncomingTextMessage message) {
+    print('[${new DateTime.now()}] ${message.actor?.name}: ${message.message}');
   }
 
   @override
@@ -76,24 +71,24 @@ class MumbleCallback with MumbleClientListener, UserListener {
   void onUserListReceived(List<RegisteredUser> users) {}
 
   @override
-  void onUserChanged(User user, User actor, UserChanges changes) {
+  void onUserChanged(User? user, User? actor, UserChanges changes) {
     // The user changed
     if (changes.channel) {
       // ...his channel
-      if (user.channel == client.selfe.channel) {
+      if (user?.channel == client.self.channel) {
         // ... to our channel
         // So greet him
-        client.selfe.channel
-            .sendMessageToChannel(message: 'Hello ${user.name}!');
+        client.self.channel
+            .sendMessageToChannel(message: 'Hello ${user?.name}!');
       }
     }
   }
 
   @override
-  void onUserRemoved(User user, User actor, String reason, bool ban) {
+  void onUserRemoved(User user, User? actor, String? reason, bool? ban) {
     if (user == actor) {
       //The user left the server
-    } else if (ban) {
+    } else if (ban ?? false) {
       // The user was baned from the server
     } else {
       // The user was kicked from the server

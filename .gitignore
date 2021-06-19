@@ -21,3 +21,5 @@ doc/api/
 *.js.map
 
 *.dll
+
+example/recordings

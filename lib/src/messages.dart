@@ -1,7 +1,6 @@
 import 'streams/protobuf_packet.dart';
 import 'package:protobuf/protobuf.dart';
 import 'generated/Mumble.pb.dart';
-import 'package:meta/meta.dart';
 
 const Map<Type, int> _messageTypes = {
   Version: version,
@@ -29,9 +28,11 @@ const Map<Type, int> _messageTypes = {
   UserStats: userStats,
   RequestBlob: requestBlob,
   ServerConfig: serverConfig,
-  SuggestConfig: suggestConfig
+  SuggestConfig: suggestConfig,
+  PluginDataTransmission: pluginDataTransmission
 };
 
+/// From https://github.com/mumble-voip/mumble/blob/master/src/Message.h
 const int version = 0,
     udpTunnel = 1,
     authenticate = 2,
@@ -57,7 +58,8 @@ const int version = 0,
     userStats = 22,
     requestBlob = 23,
     serverConfig = 24,
-    suggestConfig = 25;
+    suggestConfig = 25,
+    pluginDataTransmission = 26;
 
 /// Builds a [GeneratedMessage] from bytes.
 typedef T MessageBuilder<T extends GeneratedMessage>(List<int> bytes);
@@ -91,11 +93,13 @@ final Map<int, MessageBuilder> _builders = <int, MessageBuilder>{
   requestBlob: (List<int> bytes) => RequestBlob.fromBuffer(bytes),
   serverConfig: (List<int> bytes) => ServerConfig.fromBuffer(bytes),
   suggestConfig: (List<int> bytes) => SuggestConfig.fromBuffer(bytes),
+  pluginDataTransmission: (List<int> bytes) =>
+      PluginDataTransmission.fromBuffer(bytes),
 };
 
 class UnknownMessageException implements Exception {
   final dynamic requestedType;
-  const UnknownMessageException({@required this.requestedType});
+  const UnknownMessageException({required this.requestedType});
 
   @override
   String toString() {
@@ -104,7 +108,7 @@ class UnknownMessageException implements Exception {
 }
 
 ProtobufPacket encode<T extends GeneratedMessage>(T message) {
-  int type = _messageTypes[T];
+  int? type = _messageTypes[T];
   if (type != null) {
     return new ProtobufPacket(type: type, data: message.writeToBuffer());
   } else {
@@ -113,7 +117,7 @@ ProtobufPacket encode<T extends GeneratedMessage>(T message) {
 }
 
 GeneratedMessage decode(ProtobufPacket packet) {
-  MessageBuilder builder = _builders[packet.type];
+  MessageBuilder? builder = _builders[packet.type];
   if (builder != null) {
     return builder(packet.data);
   } else {

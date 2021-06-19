@@ -1,9 +1,7 @@
-import 'dart:typed_data';
-
-import 'package:meta/meta.dart';
-import 'package:fixnum/fixnum.dart' as Fixnum;
+import 'package:fixnum/fixnum.dart' as Fixnum show Int64;
 import 'package:protobuf/protobuf.dart';
 
+import 'model/exceptions.dart';
 import 'connection.dart';
 import 'generated/Mumble.pb.dart' as Proto;
 import 'connection_options.dart' as ConnectionOptions;
@@ -12,97 +10,79 @@ import 'messages.dart' as Messages;
 import 'dart:async';
 import 'client.dart';
 import 'model/channel.dart';
-import 'model/misc.dart';
+import 'model/voice_target.dart';
 import 'model/user.dart';
 import 'listeners.dart';
-import 'audio_packet.dart';
-import 'audio_client.dart';
+import 'audio/audio_packet.dart';
+import 'audio/audio_client.dart';
 import 'streams/protobuf_packet.dart';
+import 'model/server_infos.dart';
+import 'model/crypto.dart';
+import 'model/stats.dart';
+import 'model/ban.dart';
+import 'model/text_message.dart';
+import 'model/user_stats.dart';
+import 'model/registered_user.dart';
+import 'model/permission.dart';
 
 int _channelToId(Channel channel) => channel.channelId;
 int _userToId(User user) => user.session;
 
-class ServerInfoBase extends ServerInfo {
-  int _suggestedOpusBitrate;
-  @override
-  int get suggestedOpusBitrate => _suggestedOpusBitrate;
+const String _earlyAccessErrorText =
+    'Accessing this property is not allowed until the connect function returned!' +
+        '\r\nHow were you even able to access it?!';
 
-  int _maxBandwidth;
-  @override
-  int get maxBandwidth => _maxBandwidth;
-
-  String _welcomeText;
-  @override
-  String get welcomeText => _welcomeText;
-
-  VersionInformation _version;
-  @override
-  VersionInformation get version => _version;
-
-  ServerConfig _config;
-  @override
-  ServerConfig get config => _config;
-
-  ServerConnectionStats _connectionStats;
-  @override
-  ServerConnectionStats get connectionStats => _connectionStats;
-
-  ServerSuggestedClientConfig _suggestedClientConfig;
-  @override
-  ServerSuggestedClientConfig get suggestedClientConfig =>
-      _suggestedClientConfig;
-
-  ServerCodecVersion _codecVersion;
-  @override
-  ServerCodecVersion get codecVersion => _codecVersion;
-
-  ServerInfoBase._();
-}
-
-class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
+class MumbleClientBase extends MumbleClient
+    with Notifier<MumbleClientListener> {
   final Map<int, User> _users;
   final Map<int, Channel> _channels;
   final Connection _connection;
+  final Completer<void> _pinging;
 
+  @override
   final ConnectionOptions.ConnectionOptions options;
 
-  DateTime _lastMessageReceived;
+  DateTime? _lastMessageReceived;
 
-  AudioClientBase _audio;
+  AudioClientBase? _lateAudio;
   @override
-  AudioClient get audio => _audio;
+  AudioClient get audio {
+    if (_lateAudio != null) {
+      return _lateAudio!;
+    } else {
+      throw new StateError(_earlyAccessErrorText);
+    }
+  }
 
-  CryptState _cryptState;
+  CryptState? _lateCryptState;
   @override
-  CryptState get cryptState => _cryptState;
-
-  Selfe _selfe;
-  @override
-  Selfe get selfe => _selfe;
-
-  Completer<void> _pinging;
+  CryptState get cryptState {
+    if (_lateCryptState != null) {
+      return _lateCryptState!;
+    } else {
+      throw new StateError(_earlyAccessErrorText);
+    }
+  }
 
   final ServerInfoBase _serverInfo;
   @override
-  ServerInfo get serverInfo => synced ? _serverInfo : null;
+  ServerInfo get serverInfo => _serverInfo;
 
-  bool _synced;
-  @override
-  bool get synced => _synced ?? false;
-
-  bool _used;
-
-  MumbleClientBase({@required this.options})
-      : this._connection = new Connection(
-            host: options.host, port: options.port, context: options.context),
-        this._channels = new Map<int, Channel>(),
+  MumbleClientBase({required this.options, required Connection connection})
+      : this._connection = connection,
         this._users = new Map<int, User>(),
-        this._serverInfo = new ServerInfoBase._(),
-        this._used = false,
-        super();
+        this._channels = new Map<int, Channel>(),
+        this._serverInfo = new ServerInfoBase(),
+        this._pinging = new Completer<void>();
+
+  /// Starts the ping routine but does not await it
+  void _startPingRoutine() {
+    _pingRoutine();
+  }
 
   Future<void> _pingRoutine() async {
-    _pinging = new Completer<void>();
+    const Duration timeout = const Duration(seconds: 30);
+    final DateTime start = new DateTime.now();
     while (!_pinging.isCompleted) {
       _connection.writeMessage(new Proto.Ping()
         ..timestamp =
@@ -111,8 +91,8 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
         new Future.delayed(const Duration(seconds: 15)),
         _pinging.future
       ]);
-      if (new DateTime.now().difference(_lastMessageReceived) >=
-          const Duration(seconds: 30)) {
+      DateTime now = new DateTime.now();
+      if (now.difference(_lastMessageReceived ?? start) >= timeout) {
         print("TIMEOUT"); //TODO
       }
     }
@@ -120,34 +100,34 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
 
   @override
   Future<void> close() async {
-    await audio?.close();
-    _pinging?.complete();
-    await _connection?.close();
+    await _lateAudio?.close();
+    _pinging.complete();
+    await _connection.close();
   }
 
-  @override
-  Future<void> connect(
-      {OnBadCertificate onBadCertificate,
+  static Future<MumbleClient> connect(
+      {required ConnectionOptions.ConnectionOptions options,
+      OnBadCertificate? onBadCertificate,
       bool useUdp: true,
-      dynamic localUdpBindAddress,
+      Object? localUdpBindAddress,
       int localUdpBindPort: 0}) async {
-    if (_used) {
-      throw new ClientReuseError();
-    } else {
-      _used = true;
-    }
     Completer<void> syncCompleter = new Completer<void>();
-    Stream<ProtobufPacket> packets =
-        await _connection.connect(onBadCertificate: onBadCertificate);
-    packets.listen((ProtobufPacket message) {
+    Connection con = await Connection.connect(
+        host: options.host,
+        port: options.port,
+        context: options.context,
+        onBadCertificate: onBadCertificate);
+    MumbleClientBase client =
+        new MumbleClientBase(options: options, connection: con);
+    con.listen((ProtobufPacket message) {
       if (message.type == Messages.serverSync) {
-        _handleServerSync(Messages.decode(message) as Proto.ServerSync);
+        client._handleServerSync(Messages.decode(message) as Proto.ServerSync);
         syncCompleter.complete();
       } else {
-        _onMessage(message);
+        client._onMessage(message);
       }
-    }, onError: _onError, onDone: _onDone);
-    writeMessage(new Proto.Version()
+    }, onError: client._onError, onDone: client._onDone);
+    client.writeMessage(new Proto.Version()
       ..version = ConnectionOptions.clientVersion
       ..release = ConnectionOptions.clientName
       ..os = ConnectionOptions.os
@@ -158,18 +138,34 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
       ..celtVersions.addAll(options.celtVersions)
       ..tokens.addAll(options.tokens);
     if (options.password != null) {
-      auth.password = options.password;
+      auth.password = options.password!;
     }
-    writeMessage(auth);
-    _pingRoutine();
+    client.writeMessage(auth);
+    client._startPingRoutine();
     await syncCompleter.future;
-    _audio = await AudioClientBase.withRemoteHostLookup(
-        this, useUdp, localUdpBindAddress, localUdpBindPort);
-    _synced = true;
-    listeners.forEach((MumbleClientListener listener) => listener.onSynced());
+    // By now, the _lateSelf, _lateRootChannel and _lateCryptState should have been initalized,
+    // so assert it
+    if (client._lateCryptState == null) {
+      throw new StateError(
+          'Received sync complete message from server, but CryptState is still missing!' +
+              '\r\nThis should be impossible!');
+    }
+    if (client._lateSelf == null) {
+      throw new StateError(
+          'Received sync complete message from server, but Self is still missing!' +
+              '\r\nThis should be impossible!');
+    }
+    if (client._lateRootChannel == null) {
+      throw new StateError(
+          'Received sync complete message from server, but the root channel is still missing!' +
+              '\r\nThis should be impossible!');
+    }
+    client._lateAudio = await AudioClientBase.withRemoteHostLookup(
+        client, useUdp, localUdpBindAddress, localUdpBindPort);
+    return client;
   }
 
-  void _onError(dynamic error, [StackTrace stackTrace]) {
+  void _onError(Object error, [StackTrace? stackTrace]) {
     listeners.forEach(
         (MumbleClientListener listener) => listener.onError(error, stackTrace));
   }
@@ -183,50 +179,24 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
     switch (message.type) {
       case Messages.cryptSetup:
         Proto.CryptSetup crypt = Messages.decode(message) as Proto.CryptSetup;
-        _cryptState = new CryptState(
-            key: (!crypt.hasKey() || crypt.key.isEmpty)
-                ? cryptState.key
-                : new Uint8List.fromList(crypt.key),
-            clientNonce: (!crypt.hasClientNonce() || crypt.clientNonce.isEmpty)
-                ? cryptState.clientNonce
-                : new Uint8List.fromList(crypt.clientNonce),
-            serverNonce: (!crypt.hasServerNonce() || crypt.serverNonce.isEmpty)
-                ? cryptState.serverNonce
-                : new Uint8List.fromList(crypt.serverNonce));
+        _lateCryptState = cryptStateFromProto(crypt, _lateCryptState);
         listeners.forEach(
             (MumbleClientListener listener) => listener.onCryptStateChanged());
         break;
       case Messages.ping:
         Proto.Ping ping = Messages.decode(message) as Proto.Ping;
-        _serverInfo._connectionStats = new ServerConnectionStats(
-            packetStats: new PacketStats(
-              goodPacketCount: ping.good,
-              latePacketCount: ping.late,
-              lostPacketCount: ping.lost,
-              resync: ping.resync,
-            ),
-            tcpPacketCount: ping.tcpPackets,
-            udpPacketCount: ping.udpPackets,
-            pingStats: new PingStats(
-                tcpPingAverage: ping.tcpPingAvg,
-                tcpPingVariance: ping.tcpPingVar,
-                udpPingAverage: ping.udpPingAvg,
-                udpPingVariance: ping.udpPingVar));
+        _serverInfo.connectionStats = serverConnectionStatsFromProto(ping);
         break;
       case Messages.codecVersion:
         Proto.CodecVersion codec =
             Messages.decode(message) as Proto.CodecVersion;
-        _serverInfo._codecVersion = new ServerCodecVersion(
-            celtAlphaVersion: codec.alpha,
-            celtBetaVersion: codec.beta,
-            preferAlpha: codec.preferAlpha,
-            opus: codec.opus);
+        _serverInfo.codecVersion = serverCodecVersionFromProto(codec);
         break;
       case Messages.userStats:
         Proto.UserStats stats = Messages.decode(message) as Proto.UserStats;
-        User user = _getUser(stats.session);
+        User? user = _getUserOrSelf(stats.hasSession(), stats.session);
         if (user != null) {
-          reportUserStats(user: user, stats: createUserStats(stats: stats));
+          reportUserStats(user: user, stats: userStatsFromProto(stats: stats));
         }
         break;
       case Messages.userState:
@@ -249,61 +219,39 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
         break;
       case Messages.version:
         Proto.Version version = Messages.decode(message) as Proto.Version;
-        _serverInfo._version = new VersionInformation(
-            os: version.os,
-            osVersion: version.osVersion,
-            release: version.release,
-            version: version.version);
+        _serverInfo.version = versionInformationFromProto(version);
         break;
       case Messages.serverConfig:
         Proto.ServerConfig config =
             Messages.decode(message) as Proto.ServerConfig;
-        _serverInfo._config = new ServerConfig(
-            allowHtml: config.allowHtml,
-            maxImageMessageLength: config.imageMessageLength,
-            maxMessageLength: config.messageLength,
-            maxUsers: config.maxUsers);
-        _serverInfo._maxBandwidth = config.maxBandwidth;
-        _serverInfo._suggestedOpusBitrate =
-            Utils.adjustNetworkBandwidth(config.maxBandwidth) ??
-                Utils.defaultBitrate;
-        _serverInfo._welcomeText = config.welcomeText;
+        _serverInfo.config = serverConfigFromProto(config);
         break;
       case Messages.suggestConfig:
         Proto.SuggestConfig suggested =
             Messages.decode(message) as Proto.SuggestConfig;
-        _serverInfo._suggestedClientConfig = new ServerSuggestedClientConfig(
-            suggestedClientVersion: suggested.version,
-            usePositionalAudio: suggested.positional,
-            usePushToTalk: suggested.pushToTalk);
+        _serverInfo.suggestedClientConfig =
+            serverSuggestedClientConfigFromProto(suggested);
         break;
       case Messages.reject:
         Proto.Reject reject = Messages.decode(message) as Proto.Reject;
-        throw new RejectException(
-            reason: reject.reason,
-            rejectType: RejectType.values[reject.type.value]);
-        break;
+        throw rejectExceptionFromProto(reject);
       case Messages.permissionDenied:
         Proto.PermissionDenied denied =
             Messages.decode(message) as Proto.PermissionDenied;
-        throw new PermissionDeniedException(
-            denyType: DenyType.values[denied.type.value],
-            deniedPermission: new Permission.fromInt(denied.permission),
-            invalidUserName: denied.name,
-            reason: denied.reason,
-            channel: _getChannel(denied.channelId, ignoreNull: true),
-            user: _getUser(denied.session, ignoreNull: true));
-        break;
+        throw permissionDeniedExceptionFromProto(denied);
       case Messages.permissionQuery:
         Proto.PermissionQuery query =
             Messages.decode(message) as Proto.PermissionQuery;
-        if (query.flush) {
+        if (query.hasFlush() && query.flush) {
           listeners.forEach((MumbleClientListener listener) =>
               listener.onDropAllChannelPermissions());
         } else {
-          Channel channel = _getChannel(query.channelId);
-          Permission permissions = new Permission.fromInt(query.permissions);
-          notifyChannelPermissions(channel: channel, permissions: permissions);
+          Channel? channel = _getChannel(query.hasChannelId(), query.channelId);
+          if (channel != null) {
+            Permission permissions = new Permission.fromInt(query.permissions);
+            notifyChannelPermissions(
+                channel: channel, permissions: permissions);
+          }
         }
         break;
       case Messages.banList:
@@ -318,8 +266,8 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
             Messages.decode(message) as Proto.UserList;
         List<RegisteredUser> users = new List<RegisteredUser>.unmodifiable(
             registeredUsers.users
-                .map((Proto.UserList_User user) => createRegisteredUser(
-                    user, _getChannel(user.lastChannel, ignoreNull: true)))
+                .map((Proto.UserList_User user) => registeredUserFromProto(
+                    user, _getChannel(user.hasLastChannel(), user.lastChannel)))
                 .toList());
         listeners.forEach((MumbleClientListener listener) =>
             listener.onUserListReceived(users));
@@ -340,154 +288,66 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
   }
 
   void _handleUdpTunnel(ProtobufPacket packet) {
-    AudioPacket audio = new AudioPacket.incoming(data: packet.data);
-    _audio.feed(audio, false);
+    AudioPacket audio = IncomingAudioPacket.decodeIncoming(data: packet.data);
+    if (audio is IncomingAudioPacket) {
+      // If it is guaranteed that no voice packet is transmitted before syncing is done
+      // we could use the audio field, but I am not sure about that, so we are using the
+      // _lateAudio and by this, discarding every packet until we are synced.
+      // TODO test if we could are always synced by now and can use audio instead of _lateAudio
+      _lateAudio?.feed(audio, false);
+    } else {
+      throw new ArgumentError(
+          'Did not expect a packet here that is NOT of type IncomingAudioPacket!' +
+              'Actual type was ${audio.runtimeType}');
+    }
   }
 
   void _handleServerSync(Proto.ServerSync message) {
-    _selfe = asSelfe(user: _users[message.session]);
-    _users.remove(message.session);
-    _serverInfo._maxBandwidth = message.maxBandwidth;
-    _serverInfo._suggestedOpusBitrate =
-        Utils.adjustNetworkBandwidth(message.maxBandwidth) ??
-            Utils.defaultBitrate;
-    _serverInfo._welcomeText = message.welcomeText;
+    if (!message.hasSession()) {
+      throw ArgumentError('Bad message, session id missing!');
+    }
+    User? user = _users[message.session];
+    if (user == null) {
+      throw new StateError(
+          'A synced message was recevied, but not the own user object!');
+    }
+    _lateSelf = asSelf(user: user);
+    _users.remove(user.session);
+    _serverInfo.config =
+        updatedServerConfigFromProto(message, _serverInfo.config);
   }
 
-  User _getUser(int session, {ignoreNull: false}) {
-    if (ignoreNull && session == null) {
-      return null;
-    } else {
-      if (_selfe != null && _selfe.session == session) {
-        return _selfe;
-      } else {
-        return _users[session];
-      }
-    }
-  }
+//TODO ACL Stuff
 
-  Channel _getChannel(int id, {ignoreNull: false}) =>
-      (ignoreNull && id == null) ? null : _channels[id];
-
-  void _handleUserState(Proto.UserState message) {
-    User user = _getUser(message.session);
-    bool created = user == null;
-    if (created) {
-      user = createNewUser(client: this);
-      _users[message.session] = user;
-    }
-    Channel channel;
-    if (message.hasChannelId()) {
-      channel = _getChannel(message.channelId);
-    }
-    UserChanges changes =
-        updateUser(user: user, channel: channel, state: message);
-    if (synced) {
-      if (created) {
-        listeners.forEach(
-            (MumbleClientListener listener) => listener.onUserAdded(user));
-      } else {
-        notifyUserUpdate(
-            user: user, actor: _getUser(message.actor), changes: changes);
-      }
-    }
-  }
-
-  void _handleUserRemove(Proto.UserRemove message) {
-    User user = _users.remove(message.session);
-    if (user != null && synced) {
-      notifyUserRemoved(
-          user: user,
-          actor: _getUser(message.actor),
-          reason: message.reason,
-          ban: message.ban);
-    }
-  }
-
-  void _handleChannelState(Proto.ChannelState message) {
-    Channel channel = _getChannel(message.channelId);
-    bool created = channel == null;
-    if (created) {
-      channel = createNewChannel(client: this);
-      _channels[message.channelId] = channel;
-    }
-    Channel parent;
-    if (message.hasParent()) {
-      parent = _getChannel(message.parent);
-    }
-    List<Channel> links;
-    if (message.linksRemove.isNotEmpty) {
-      links = channel.links;
-      List<Channel> change = new List<Channel>();
-      for (int remove in message.linksRemove) {
-        Channel other = _getChannel(remove);
-        other.links.remove(channel);
-        links.remove(other);
-        change.add(other);
-        notifyChannelUpdate(channel: other, changes: linksChanged);
-      }
-    } else if (message.linksAdd.isNotEmpty) {
-      links = channel.links;
-      List<Channel> change = new List<Channel>();
-      for (int add in message.linksAdd) {
-        Channel other = _getChannel(add);
-        other.links.add(channel);
-        links.add(channel);
-        change.add(other);
-        notifyChannelUpdate(channel: other, changes: linksChanged);
-      }
-    } else if (message.links.isNotEmpty) {
-      links = new List<Channel>();
-      for (int id in message.links) {
-        Channel element = _getChannel(id);
-        if (element != null) {
-          links.add(element);
-        }
-      }
-    }
-    ChannelChanges changes = updateChannel(
-        channel: channel, parent: parent, state: message, links: links);
-    if (synced) {
-      if (created) {
-        listeners.forEach((MumbleClientListener listener) =>
-            listener.onChannelAdded(channel));
-      } else {
-        notifyChannelUpdate(channel: channel, changes: changes);
-      }
-    }
-  }
-
-  void _handleChannelRemove(Proto.ChannelRemove message) {
-    Channel channel = _channels.remove(message.channelId);
-    if (channel != null && synced) {
-      notifyChannelRemoved(channel: channel);
-    }
-  }
-
-  void _handleTextMessage(Proto.TextMessage message) {
-    TextMessage msg = new TextMessage.incoming(
-        actor: _getUser(message.actor),
-        message: message.message,
-        clients: message.session.map(_getUser).toList(),
-        channels: message.channelId.map(_getChannel).toList(),
-        trees: message.treeId.map(_getChannel).toList());
-    listeners.forEach(
-        (MumbleClientListener listener) => listener.onTextMessage(msg));
-  }
+//TODO Plugin Stuff
 
   void writeMessage<T extends GeneratedMessage>(T message) {
     _connection.writeMessage<T>(message);
   }
 
+  void _handleTextMessage(Proto.TextMessage message) {
+    IncomingTextMessage msg = incomingTextMessageFromProto(
+        actor: _getUserOrSelf(message.hasActor(), message.actor),
+        message: message.message,
+        clients: message.session
+            .map((int session) => _getUserOrSelf(true, session))
+            .toList()
+            .filterNull(),
+        channels: message.channelId
+            .map((int channel) => _getChannel(true, channel))
+            .toList()
+            .filterNull(),
+        trees: message.treeId
+            .map((int channel) => _getChannel(true, channel))
+            .toList()
+            .filterNull());
+    listeners.forEach(
+        (MumbleClientListener listener) => listener.onTextMessage(msg));
+  }
+
   void tunnelAudioPacket(AudioPacket packet) {
     _connection.tunnelAudioPacket(packet);
   }
-
-  @override
-  Map<int, User> getUsers() => new Map<int, User>.of(_users);
-
-  @override
-  Map<int, Channel> getChannels() => new Map<int, Channel>.of(_channels);
 
   @override
   void requestCryptStateResync() => writeMessage(
@@ -497,51 +357,20 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
   void queryBans() => writeMessage(new Proto.BanList()..query = true);
 
   @override
-  void queryUsersByNames({@required List<String> names}) =>
-      writeMessage(new Proto.QueryUsers()..names.addAll(names));
-
-  @override
-  void queryUsersByIds({@required List<int> ids}) =>
-      writeMessage(new Proto.QueryUsers()..ids.addAll(ids));
-
-  @override
-  void updateTokens({@required List<String> tokens}) =>
+  void updateTokens({required List<String> tokens}) =>
       writeMessage(new Proto.Authenticate()..tokens.addAll(tokens));
 
-//TODO ACL Stuff
-
   @override
-  void listUsers() => writeMessage(new Proto.UserList());
-
-  @override
-  void createChannel(
-      {@required String name,
-      int position,
-      int maxUsers,
-      String description,
-      bool temporary,
-      Channel parent}) {
-    Proto.ChannelState channel = Proto.ChannelState();
-    channel.parent = parent?.channelId ?? rootChannelId;
-    channel.name = name;
-    if (position != null) channel.position = position;
-    if (maxUsers != null) channel.maxUsers = maxUsers;
-    if (description != null) channel.description = description;
-    if (temporary != null) channel.temporary = temporary;
-    writeMessage(channel);
-  }
-
-  @override
-  void sendMessage({@required TextMessage message}) {
+  void sendMessage({required OutgoingTextMessage message}) {
     Proto.TextMessage msg = new Proto.TextMessage();
     msg.message = message.message;
-    if (message.trees != null && message.trees.isNotEmpty) {
+    if (message.trees.isNotEmpty) {
       msg.treeId.addAll(message.trees.map(_channelToId));
     }
-    if (message.channels != null && message.channels.isNotEmpty) {
+    if (message.channels.isNotEmpty) {
       msg.channelId.addAll(message.channels.map(_channelToId));
     }
-    if (message.clients != null && message.clients.isNotEmpty) {
+    if (message.clients.isNotEmpty) {
       msg.session.addAll(message.clients.map(_userToId));
     }
     writeMessage(msg);
@@ -556,6 +385,224 @@ class MumbleClientBase with Notifier<MumbleClientListener>, MumbleClient {
   }
 
   @override
-  void registerVoiceTarget({VoiceTarget target}) =>
+  void registerVoiceTarget({required VoiceTarget target}) =>
       writeMessage(serializeVoiceTarget(target));
+
+  // Channel Section
+  @override
+  Map<int, Channel> getChannels() => new Map<int, Channel>.of(_channels);
+
+  Channel? _getChannel(bool hasChannel, int id) {
+    return hasChannel ? _channels[id] : null;
+  }
+
+  Channel? _lateRootChannel;
+  @override
+  Channel get rootChannel {
+    if (_lateRootChannel != null) {
+      return _lateRootChannel!;
+    } else {
+      throw new StateError(_earlyAccessErrorText);
+    }
+  }
+
+  void _handleChannelState(Proto.ChannelState message) {
+    if (!message.hasChannelId()) {
+      throw new ArgumentError('Bad message, channel id missing!');
+    }
+    final bool created;
+    final Channel channel;
+    Channel? channelOrNull = _getChannel(true, message.channelId);
+    if (channelOrNull == null) {
+      channel = createNewChannel(channelId: message.channelId, client: this);
+      _channels[message.channelId] = channel;
+      if (channel.channelId == rootChannelId) {
+        _lateRootChannel = channel;
+      }
+      created = true;
+    } else {
+      channel = channelOrNull;
+      created = false;
+    }
+    Channel? parent = _getChannel(message.hasParent(), message.parent);
+    List<Channel>? links;
+    if (message.linksRemove.isNotEmpty) {
+      links = channel.links;
+      List<Channel> change = <Channel>[];
+      for (int remove in message.linksRemove) {
+        Channel? other = _getChannel(true, remove);
+        if (other != null) {
+          other.links.remove(channel);
+          links.remove(other);
+          change.add(other);
+          notifyChannelUpdate(channel: other, changes: linksChanged);
+        }
+      }
+    } else if (message.linksAdd.isNotEmpty) {
+      links = channel.links;
+      List<Channel> change = <Channel>[];
+      for (int add in message.linksAdd) {
+        Channel? other = _getChannel(true, add);
+        if (other != null) {
+          other.links.add(channel);
+          links.add(other);
+          change.add(other);
+          notifyChannelUpdate(channel: other, changes: linksChanged);
+        }
+      }
+    } else if (message.links.isNotEmpty) {
+      links = <Channel>[];
+      for (int id in message.links) {
+        Channel? element = _getChannel(true, id);
+        if (element != null) {
+          links.add(element);
+        }
+      }
+    }
+    ChannelChanges changes = updateChannel(
+        channel: channel, parent: parent, state: message, links: links);
+    if (created) {
+      listeners.forEach(
+          (MumbleClientListener listener) => listener.onChannelAdded(channel));
+    } else {
+      notifyChannelUpdate(channel: channel, changes: changes);
+    }
+  }
+
+  void _handleChannelRemove(Proto.ChannelRemove message) {
+    if (message.hasChannelId()) {
+      if (message.channelId != 0) {
+        Channel? channel = _channels.remove(message.channelId);
+        if (channel != null) {
+          notifyChannelRemoved(channel: channel);
+        }
+      } else {
+        throw new ArgumentError('Can not remove the root channel!');
+      }
+    } else {
+      throw new ArgumentError('Bad message, channel id missing!');
+    }
+  }
+
+  @override
+  void createChannel(
+      {required String name,
+      int? position,
+      int? maxUsers,
+      String? description,
+      bool? temporary,
+      Channel? parent}) {
+    Proto.ChannelState channel = Proto.ChannelState();
+    channel.parent = parent?.channelId ?? rootChannelId;
+    channel.name = name;
+    if (position != null) channel.position = position;
+    if (maxUsers != null) channel.maxUsers = maxUsers;
+    if (description != null) channel.description = description;
+    if (temporary != null) channel.temporary = temporary;
+    writeMessage(channel);
+  }
+
+  // User Section
+
+  Self? _lateSelf;
+  @override
+  Self get self {
+    if (_lateSelf != null) {
+      return _lateSelf!;
+    } else {
+      throw new StateError(_earlyAccessErrorText);
+    }
+  }
+
+  @override
+  Map<int, User> getUsers() => new Map<int, User>.of(_users);
+
+  User? _getUserOrSelf(bool hasUser, int session) {
+    if (hasUser) {
+      if (_lateSelf != null) {
+        if (_lateSelf!.session == session) {
+          return _lateSelf;
+        }
+      }
+      return _users[session];
+    } else {
+      return null;
+    }
+  }
+
+  void _handleUserState(Proto.UserState message) {
+    if (!message.hasSession()) {
+      throw new ArgumentError('Bad message, session id missing!');
+    }
+    Channel? channel = _getChannel(message.hasChannelId(), message.channelId) ??
+        _lateRootChannel;
+    if (channel == null) {
+      throw new StateError(
+          'Channel is null and there is no root channel! This should never happen!');
+    }
+    final bool created;
+    final User user;
+    User? userOrNull = _getUserOrSelf(true, message.session);
+    if (userOrNull == null) {
+      user = createNewUser(
+          client: this, sessionId: message.session, channel: channel);
+      _users[message.session] = user;
+      created = true;
+    } else {
+      user = userOrNull;
+      created = false;
+    }
+
+    UserChanges changes =
+        updateUser(user: user, channel: channel, state: message);
+
+    if (created) {
+      listeners.forEach(
+          (MumbleClientListener listener) => listener.onUserAdded(user));
+    } else {
+      notifyUserUpdate(
+          user: user,
+          actor: _getUserOrSelf(message.hasActor(), message.actor),
+          changes: changes);
+    }
+  }
+
+  void _handleUserRemove(Proto.UserRemove message) {
+    User? user = _users.remove(message.session);
+    if (user != null) {
+      notifyUserRemoved(
+          user: user,
+          actor: _getUserOrSelf(message.hasActor(), message.actor),
+          reason: message.reason,
+          ban: message.ban);
+    }
+  }
+
+  @override
+  void queryUsersByNames({required List<String> names}) =>
+      writeMessage(new Proto.QueryUsers()..names.addAll(names));
+
+  @override
+  void queryUsersByIds({required List<int> ids}) =>
+      writeMessage(new Proto.QueryUsers()..ids.addAll(ids));
+
+  @override
+  void listUsers() => writeMessage(new Proto.UserList());
+}
+
+class ServerInfoBase extends ServerInfo {
+  @override
+  VersionInformation? version;
+
+  @override
+  ServerConfig? config;
+
+  @override
+  ServerConnectionStats? connectionStats;
+
+  @override
+  ServerSuggestedClientConfig? suggestedClientConfig;
+
+  @override
+  ServerCodecVersion? codecVersion;
 }

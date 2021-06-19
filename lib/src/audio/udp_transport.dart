@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'model/misc.dart';
+import '../model/crypto.dart';
 import 'audio_packet.dart';
 import 'dart:typed_data';
 import 'dart:async';
-import 'package:meta/meta.dart';
-import 'crypto.dart';
-import 'client.dart' show CryptStateProvider;
+import '../crypto.dart';
+import '../client.dart' show CryptStateProvider;
+import '../utils.dart' show FilterNullStream;
 
 class UdpPingException implements Exception {
   @override
@@ -13,54 +13,32 @@ class UdpPingException implements Exception {
       'UdpPingException: Pinging not successfull. This means that the udp transport is too unreliable at the moment. This may change when pinging is succesfull again.';
 }
 
-class UdpTransport {
-  final InternetAddress remoteHost;
-  final dynamic localBindAddress;
-  final int localPort;
-  final int remotePort;
+typedef void ResyncRequestHandler();
 
-  final Duration pingIntervall;
-  final Duration timeout;
+abstract class UdpTransport {
+  InternetAddress get remoteHost;
+  Object? get localBindAddress;
+  int get localPort;
+  int get remotePort;
+  Duration get pingIntervall;
+  Duration get timeout;
+  bool get pingingSuccessfull;
+  Stream<IncomingAudioPacket> get audio;
+  Duration? get latency;
 
-  RawDatagramSocket _transport;
-  bool _pingingSuccessfull;
-  Completer<void> _pinging;
-  final Ocb2Aes128 _crypto;
-  final CryptStateProvider _client;
-
-  bool get pingingSuccessfull => _pingingSuccessfull;
-
-  final StreamController<AudioPacket> _audio;
-
-  Stream<AudioPacket> get audio => _audio.stream;
-
-  Duration get latency => _latency;
-  Duration _latency;
-
-  UdpTransport(
-      {@required this.remoteHost,
-      @required this.localPort,
-      @required this.remotePort,
-      @required this.localBindAddress,
-      @required CryptStateProvider cryptStateProvider,
-      Duration pingIntervall,
-      Duration timeout})
-      : this.pingIntervall = pingIntervall ?? const Duration(seconds: 2),
-        this.timeout = timeout ?? const Duration(seconds: 5),
-        this._audio = new StreamController<AudioPacket>.broadcast(),
-        this._pingingSuccessfull = false,
-        this._client = cryptStateProvider,
-        this._crypto = new Ocb2Aes128(key: cryptStateProvider.cryptState.key);
+  void writePacket(AudioPacket packet);
+  Stream<bool> useUdp({ResyncRequestHandler? onResyncRequest});
+  void close();
 
   static Future<UdpTransport> withRemoteHostLookup(
-      {@required String remoteHost,
-      @required int localPort,
-      @required int remotePort,
-      @required dynamic localBindAddress,
-      @required CryptStateProvider cryptStateProvider,
-      Duration pingIntervall,
-      Duration timeout}) async {
-    return new UdpTransport(
+      {required String remoteHost,
+      required int localPort,
+      required int remotePort,
+      Object? localBindAddress,
+      required CryptStateProvider cryptStateProvider,
+      Duration? pingIntervall,
+      Duration? timeout}) async {
+    return new _UdpTransportBase(
         remoteHost: (await InternetAddress.lookup(remoteHost,
                 type: (localBindAddress == null
                     ? InternetAddressType.IPv4
@@ -73,29 +51,80 @@ class UdpTransport {
         pingIntervall: pingIntervall,
         timeout: timeout);
   }
+}
 
+class _UdpTransportBase extends UdpTransport {
+  @override
+  final InternetAddress remoteHost;
+  @override
+  final Object? localBindAddress;
+  @override
+  final int localPort;
+  @override
+  final int remotePort;
+
+  @override
+  final Duration pingIntervall;
+  @override
+  final Duration timeout;
+
+  RawDatagramSocket? _transport;
+  bool _pingingSuccessfull;
+  Completer<void>? _pinging;
+  final Ocb2Aes128 _crypto;
+  final CryptStateProvider _client;
+
+  @override
+  bool get pingingSuccessfull => _pingingSuccessfull;
+
+  final StreamController<IncomingAudioPacket> _audio;
+
+  @override
+  Stream<IncomingAudioPacket> get audio => _audio.stream;
+
+  @override
+  Duration? get latency => _latency;
+  Duration? _latency;
+
+  _UdpTransportBase(
+      {required this.remoteHost,
+      required this.localPort,
+      required this.remotePort,
+      required this.localBindAddress,
+      required CryptStateProvider cryptStateProvider,
+      Duration? pingIntervall,
+      Duration? timeout})
+      : this.pingIntervall = pingIntervall ?? const Duration(seconds: 2),
+        this.timeout = timeout ?? const Duration(seconds: 5),
+        this._audio = new StreamController<IncomingAudioPacket>.broadcast(),
+        this._pingingSuccessfull = false,
+        this._client = cryptStateProvider,
+        this._crypto = new Ocb2Aes128(key: cryptStateProvider.cryptState.key);
+
+  @override
   void close() {
     _pinging?.complete();
   }
 
-  Stream<bool> useUdp({void Function() onResyncRequest}) async* {
-    StreamSubscription receiving;
+  @override
+  Stream<bool> useUdp({ResyncRequestHandler? onResyncRequest}) async* {
+    StreamSubscription? receiving;
     try {
       _pinging = new Completer<void>();
       _transport = await RawDatagramSocket.bind(
           localBindAddress ?? InternetAddress.anyIPv4, localPort);
-      DateTime lastPingReceived;
-      receiving = _transport
-          .handleError((dynamic error, StackTrace stackTrace) async {
+      DateTime? lastPingReceived;
+      receiving = _transport!
+          .handleError((dynamic error, StackTrace? stackTrace) async {
             //TODO
             print(error); //TODO
             print(stackTrace); //TODO
           }, test: (dynamic error) => error is SocketException)
           .where((RawSocketEvent event) => event == RawSocketEvent.read)
-          .map((RawSocketEvent _) => _transport.receive())
-          .where((Datagram datagram) => datagram != null)
+          .map<Datagram?>((RawSocketEvent _) => _transport!.receive())
+          .filterNull()
           .map(_decodeDatagram)
-          .where((AudioPacket packet) => packet != null)
+          .filterNull()
           .handleError((dynamic error, StackTrace stackTrace) {
             if (onResyncRequest != null && error is NonceOutOfSyncException) {
               onResyncRequest();
@@ -105,26 +134,29 @@ class UdpTransport {
             }
           })
           .listen((AudioPacket packet) {
-            if (packet.type == AudioPacketType.ping) {
-              lastPingReceived = new DateTime.now();
-              _latency = lastPingReceived.difference(
-                  new DateTime.fromMillisecondsSinceEpoch(
-                      packet.pingTimestamp));
-            } else {
+            if (packet is PingPacket) {
+              DateTime now = new DateTime.now();
+              lastPingReceived = now;
+              _latency = now.difference(new DateTime.fromMillisecondsSinceEpoch(
+                  packet.pingTimestamp));
+            } else if (packet is IncomingAudioPacket) {
               _audio.add(packet);
+            } else {
+              throw new ArgumentError(
+                  'It should be impossible to recieve anything else then a PingPacket or IncomingAudioPacket here!' +
+                      'Recieved ${packet.runtimeType}: $packet');
             }
           });
       DateTime lastPingSended;
-      while (!_pinging.isCompleted) {
+      while (_stillPinging()) {
         lastPingSended = new DateTime.now();
-        AudioPacket ping = new AudioPacket.ping(
-            pingTimestamp: lastPingSended.millisecondsSinceEpoch);
-        await writePacket(ping);
+        writePacket(new PingPacket.outgoing(
+            pingTimestamp: lastPingSended.millisecondsSinceEpoch));
         await Future.any(
-            <Future>[Future.delayed(pingIntervall), _pinging.future]);
-        if (!_pinging.isCompleted) {
+            <Future>[Future.delayed(pingIntervall), _pinging!.future]);
+        if (_stillPinging()) {
           if (lastPingReceived != null) {
-            if (lastPingReceived.difference(lastPingSended) >= timeout) {
+            if (lastPingReceived!.difference(lastPingSended) >= timeout) {
               if (_pingingSuccessfull) {
                 _pingingSuccessfull = false;
                 _latency = null;
@@ -143,6 +175,17 @@ class UdpTransport {
       await receiving?.cancel();
       await _audio.close();
       _transport?.close();
+      _transport = null;
+      _latency = null;
+      _pinging = null;
+    }
+  }
+
+  bool _stillPinging() {
+    if (_pinging != null) {
+      return _pinging!.isCompleted;
+    } else {
+      return false;
     }
   }
 
@@ -181,10 +224,10 @@ class UdpTransport {
     }
   }
 
-  AudioPacket _decodeDatagram(Datagram datagram) {
+  AudioPacket? _decodeDatagram(Datagram datagram) {
     try {
       if (datagram.address == remoteHost && datagram.port == remotePort) {
-        return new AudioPacket.incoming(data: _decode(datagram.data));
+        return IncomingAudioPacket.decodeIncoming(data: _decode(datagram.data));
       } else {
         return null;
       }
@@ -193,12 +236,19 @@ class UdpTransport {
     }
   }
 
+  @override
   void writePacket(AudioPacket packet) {
-    _BufferSink sink = new _BufferSink();
-    packet.writeTo(sink);
-    sink.close();
-    Uint8List encoded = _encode(sink.data);
-    _transport.send(encoded, remoteHost, remotePort);
+    RawDatagramSocket? transport = _transport;
+    if (transport != null) {
+      _BufferSink sink = new _BufferSink();
+      packet.writeTo(sink);
+      sink.closeSync();
+      Uint8List encoded = _encode(sink.data);
+      transport.send(encoded, remoteHost, remotePort);
+    } else {
+      //TODO maybe just ignore since udp is connection less in the first place? Or introduce a return value and return false?
+      throw new StateError('Can not write a packet on a unbound socket!');
+    }
   }
 }
 
@@ -215,22 +265,26 @@ class _DecryptionException implements Exception {
 class _BufferSink extends StreamSink<List<int>> {
   final Completer<void> _done;
   final List<List<int>> _buffer;
-  Uint8List _data;
-  Uint8List get data => _done.isCompleted ? _data : null;
+  Uint8List? _data;
+  bool get isDone => _done.isCompleted;
+  Uint8List get data => isDone
+      ? _data!
+      : throw new StateError(
+          'Accessing the data is only allowed after this sink is done!');
 
   _BufferSink()
-      : this._buffer = new List<List<int>>(),
+      : this._buffer = <List<int>>[],
         this._done = new Completer<void>();
 
   @override
   void add(List<int> event) {
-    if (!_done.isCompleted) {
+    if (!isDone) {
       _buffer.add(event);
     }
   }
 
   @override
-  void addError(Object error, [StackTrace stackTrace]) {
+  void addError(Object error, [StackTrace? stackTrace]) {
     throw error;
   }
 
@@ -242,21 +296,25 @@ class _BufferSink extends StreamSink<List<int>> {
   }
 
   @override
-  Future<void> close() {
-    if (!_done.isCompleted) {
+  Future<void> close() async {
+    closeSync();
+  }
+
+  void closeSync() {
+    if (!isDone) {
       int size = 0;
       for (List<int> list in _buffer) {
         size += list.length;
       }
-      _data = new Uint8List(size);
+      Uint8List data = new Uint8List(size);
       int index = 0;
       for (List<int> list in _buffer) {
-        _data.setRange(index, index + list.length, list);
+        data.setRange(index, index + list.length, list);
         index += list.length;
       }
+      _data = data;
       _done.complete();
     }
-    return new Future<void>.value();
   }
 
   @override

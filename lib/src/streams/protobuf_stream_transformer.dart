@@ -7,11 +7,11 @@ class ProtobufStreamTransformer
   @override
   Stream<ProtobufPacket> bind(Stream<Uint8List> stream) async* {
     int index = 0;
-    Uint8List out;
-    int outLength;
+    Uint8List? out;
+    int? outLength;
     ByteData header = new ByteData(6);
     int headerIndex = 0;
-    int currentType;
+    int? currentType;
     await for (Uint8List bytes in stream) {
       int bytesIndex = 0;
       int bytesLeft = bytes.length;
@@ -34,7 +34,7 @@ class ProtobufStreamTransformer
           if ((outLength <= bytesLeft) && out == null) {
             Uint8List data = new Uint8List.view(
                 bytes.buffer, bytesIndex + bytes.offsetInBytes, outLength);
-            yield new ProtobufPacket(type: currentType, data: data);
+            yield new ProtobufPacket(type: currentType!, data: data);
             bytesIndex += outLength;
             bytesLeft -= outLength;
             outLength = null;
@@ -51,7 +51,7 @@ class ProtobufStreamTransformer
             bytesLeft -= add;
             index += add;
             if (outLength == index) {
-              yield new ProtobufPacket(type: currentType, data: out);
+              yield new ProtobufPacket(type: currentType!, data: out);
               out = null;
               outLength = null;
               headerIndex = 0;

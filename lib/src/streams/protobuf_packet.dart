@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:meta/meta.dart';
 
 class ProtobufPacket {
   final int type;
@@ -8,10 +7,9 @@ class ProtobufPacket {
 
   int get length => data.lengthInBytes;
 
-  void writeTo(StreamSink<List<int>> sink){
+  void writeTo(StreamSink<List<int>> sink) {
     sink.add(data);
   }
 
-  const ProtobufPacket({@required this.type, @required this.data});
+  const ProtobufPacket({required this.type, required this.data});
 }
-

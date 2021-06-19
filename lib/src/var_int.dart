@@ -57,6 +57,9 @@ extension VarIntExtension on ByteData {
       this.setUint8(index, _target64);
       this.setUint64(index + 1, value);
       lengthInBytes = 9;
+    } else {
+      throw new ArgumentError.value(
+          value, 'value', 'must not exceed 0x7FFFFFFFFFFFFFFF!');
     }
     return lengthInBytes;
   }
@@ -93,7 +96,7 @@ extension VarIntExtension on ByteData {
       value = ~(msb & _cmaskByteInverted);
       lengthInBytes = 1;
     } else {
-      return null;
+      throw new ArgumentError('No valid VarInt found at index $index!');
     }
     return new VarIntResult._(value, lengthInBytes);
   }
@@ -112,7 +115,7 @@ class VarIntResult {
       other.lengthInBytes == lengthInBytes;
 
   @override
-  int get hashCode => value+lengthInBytes;
+  int get hashCode => value + lengthInBytes;
 
   @override
   String toString() {

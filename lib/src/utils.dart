@@ -9,9 +9,9 @@ int encodeVersion(int major, int minor, int patch) {
 
 const int defaultBitrate = 48000;
 
-int adjustNetworkBandwidth(int bitspersec) {
+int adjustNetworkBandwidth(int? bitspersec) {
   if (bitspersec == null || bitspersec == 0) {
-    return null;
+    return defaultBitrate;
   } else {
     int framesPerPacket = 1;
     int bitrate = defaultBitrate;
@@ -26,7 +26,7 @@ int adjustNetworkBandwidth(int bitspersec) {
   }
 }
 
-int getNetworkBandwidth(bitrate, frames) {
+int getNetworkBandwidth(int bitrate, int frames) {
   int overhead = 20 + 8 + 4 + 1 + 2 + frames + 12;
   overhead *= (800 / frames).ceil();
   return overhead + bitrate;
@@ -92,5 +92,17 @@ extension ByteAddress on InternetAddress {
     } else {
       return this;
     }
+  }
+}
+
+extension FilterNullStream<T> on Stream<T?> {
+  Stream<T> filterNull() => this.where((T? event) => event != null).cast<T>();
+}
+
+extension FilterNullList<T> on List<T?> {
+  List<T> filterNull() {
+    List<T?> copy = new List<T?>.from(this);
+    copy.retainWhere((T? event) => event != null);
+    return copy.cast<T>();
   }
 }

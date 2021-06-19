@@ -21,7 +21,7 @@ class ProtobufHeaderPrepender extends StreamSink<ProtobufPacket> {
     header.setUint16(0, event.type);
     header.setUint32(2, event.length);
     _wrapped.add(Uint8List.view(header.buffer));
-    event.writeTo(_wrapped);    
+    event.writeTo(_wrapped);
   }
 
   @override
@@ -42,7 +42,7 @@ class ProtobufHeaderPrepender extends StreamSink<ProtobufPacket> {
   }
 
   @override
-  void addError(Object error, [StackTrace stackTrace]) {
+  void addError(Object error, [StackTrace? stackTrace]) {
     _wrapped.addError(error, stackTrace);
   }
 }

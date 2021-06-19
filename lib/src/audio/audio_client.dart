@@ -1,15 +1,13 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:dumble/dumble.dart';
-import 'package:dumble/src/utils.dart';
-
 import 'audio_packet.dart';
-import 'package:meta/meta.dart';
 
-import 'client_base.dart';
-import 'listeners.dart';
-import 'model/audio.dart';
+import '../client_base.dart';
+import '../listeners.dart';
+import '../model/audio.dart';
+import '../model/user.dart';
 import 'udp_transport.dart';
+import '../utils.dart' show JsonString;
 
 /// An AudioFrame contains encoded audio data and optional positional information.
 class AudioFrame with JsonString {
@@ -17,8 +15,8 @@ class AudioFrame with JsonString {
   final Uint8List frame;
 
   /// Optional positional information for this frame.
-  final PositionalInformation positionalInformation;
-  const AudioFrame({@required this.frame, this.positionalInformation});
+  final PositionalInformation? positionalInformation;
+  const AudioFrame({required this.frame, this.positionalInformation});
 
   @override
   Map<String, Object> jsonMap() => new Map<String, Object>()
@@ -41,10 +39,10 @@ abstract class AudioClient with Notifier<AudioListener> {
   }
 
   /// If this client should use udp.
-  final bool shouldUseUdp;
+  bool get shouldUseUdp;
 
-  /// The udp latency.
-  Duration get udpLatency;
+  /// The udp latency or null if currently not using udp.
+  Duration? get udpLatency;
 
   /// If audio is currently transmitted using udp. If this is false, tcp transport is used.
   ///
@@ -54,8 +52,6 @@ abstract class AudioClient with Notifier<AudioListener> {
   ///
   /// The value of this field may change over time. For example when switching back to udp after using tcp.
   bool get udpCurrentlyAvailable;
-
-  AudioClient({@required this.shouldUseUdp});
 
   Future<void> close();
 
@@ -68,17 +64,17 @@ abstract class AudioClient with Notifier<AudioListener> {
   ///
   /// See the [Mumble voice data specification](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html) for mor details.
   AudioFrameSink sendAudio(
-      {@required AudioCodec codec,
+      {required AudioCodec codec,
       int voiceTarget: normalTalking,
       int framesPerPacket});
 }
 
 class AudioClientBase extends AudioClient {
   final MumbleClientBase _client;
-  final UdpTransport _udpTransport;
+  final UdpTransport? _udpTransport;
   final List<_UdpErrorReceiver> _overUdp;
   final List<AudioFrameSink> _sinks;
-  final Map<int, Stream<AudioFrame>> _streams;
+  final Map<int, _AudioFrameStream> _streams;
 
   bool _udpAvailable;
 
@@ -86,11 +82,14 @@ class AudioClientBase extends AudioClient {
   bool get udpCurrentlyAvailable => shouldUseUdp && _udpAvailable;
 
   @override
-  Duration get udpLatency => shouldUseUdp ? _udpTransport.latency : false;
+  Duration? get udpLatency => shouldUseUdp ? _udpTransport!.latency : null;
+
+  @override
+  bool get shouldUseUdp => _udpTransport != null;
 
   static Future<AudioClientBase> withRemoteHostLookup(MumbleClientBase client,
-      bool shouldUseUdp, dynamic localBindAddress, int localPort) async {
-    UdpTransport transport;
+      bool shouldUseUdp, Object? localBindAddress, int localPort) async {
+    UdpTransport? transport;
     if (shouldUseUdp) {
       transport = await UdpTransport.withRemoteHostLookup(
           cryptStateProvider: client,
@@ -99,26 +98,26 @@ class AudioClientBase extends AudioClient {
           remoteHost: client.options.host,
           remotePort: client.options.port);
     }
-    return new AudioClientBase(client, shouldUseUdp, transport);
+    return new AudioClientBase(client, transport);
   }
 
-  AudioClientBase(this._client, bool shouldUseUdp, this._udpTransport)
+  AudioClientBase(this._client, this._udpTransport)
       : this._udpAvailable = false,
-        this._overUdp = new List<_UdpErrorReceiver>(),
-        this._streams = new Map<int, Stream<AudioFrame>>(),
-        this._sinks = new List<AudioFrameSink>(),
-        super(shouldUseUdp: shouldUseUdp) {
+        this._overUdp = <_UdpErrorReceiver>[],
+        this._streams = new Map<int, _AudioFrameStream>(),
+        this._sinks = <AudioFrameSink>[] {
     if (shouldUseUdp) {
-      _udpTransport
+      _udpTransport!
           .useUdp(onResyncRequest: _client.requestCryptStateResync)
           .listen(_onUdpAvailabilityChange);
-      _udpTransport.audio.listen((AudioPacket packet) => feed(packet, true));
+      _udpTransport!.audio
+          .listen((IncomingAudioPacket packet) => feed(packet, true));
     }
   }
 
   @override
   Future<void> close() async {
-    List<Future> closeFutures = new List<Future>();
+    List<Future> closeFutures = <Future>[];
     for (Stream<AudioFrame> stream in _streams.values) {
       closeFutures.add((stream as _AudioFrameStream).close());
     }
@@ -151,18 +150,18 @@ class AudioClientBase extends AudioClient {
     }
   }
 
-  void feed(AudioPacket packet, bool fromUdp) {
-    _AudioFrameStream stream = _streams[packet.sessionId];
+  void feed(IncomingAudioPacket packet, bool fromUdp) {
+    _AudioFrameStream? stream = _streams[packet.sessionId];
     if (stream == null) {
       stream = new _AudioFrameStream(packet.sessionId);
       _streams[packet.sessionId] = stream;
       if (fromUdp) {
         _overUdp.add(stream);
       }
-      User user = _client.getUsers()[packet.sessionId];
+      User? user = _client.getUsers()[packet.sessionId];
       for (AudioListener listener in listeners) {
         listener.onAudioReceived(
-            stream, packet.type.codec, user, TalkMode.values[packet.target]);
+            stream, packet.codec, user, TalkMode.values[packet.target]);
       }
     }
     for (Uint8List frame in packet.frames) {
@@ -177,77 +176,98 @@ class AudioClientBase extends AudioClient {
 
   @override
   AudioFrameSink sendAudio(
-      {@required AudioCodec codec,
+      {required AudioCodec codec,
       int voiceTarget: normalTalking,
-      int framesPerPacket}) {
+      int framesPerPacket = 1}) {
     framesPerPacket = codec == AudioCodec.opus ? 1 : framesPerPacket;
     AudioFrameSinkBase sink;
     if (udpCurrentlyAvailable) {
-      sink = new AudioFrameSinkBase.udp(
-          codec, _udpTransport, framesPerPacket, voiceTarget);
-      _overUdp.add(sink);
+      sink = new AudioFrameSinkUdp(
+          _udpTransport!, codec, framesPerPacket, voiceTarget);
+      _overUdp.add(sink as AudioFrameSinkUdp);
     } else {
-      sink = new AudioFrameSinkBase.tunnel(
-          codec, _client, framesPerPacket, voiceTarget);
+      sink = new AudioFrameSinkTunnel(
+          _client, codec, framesPerPacket, voiceTarget);
     }
     _sinks.add(sink);
     return sink;
   }
 }
 
-typedef void AudioErrorCallback(dynamic error, [StackTrace stackTrace]);
+typedef void AudioErrorCallback(dynamic error, [StackTrace? stackTrace]);
 
 /// A sink for [AudioFrame]s that should be transported to the Mumble server.
 ///
-/// Use te [onError] callback to receive transport errors.
+/// Use the [onError] callback to receive transport errors.
 abstract class AudioFrameSink extends StreamSink<AudioFrame> {
   /// Invoked when an audio error occurs
-  AudioErrorCallback onError;
+  AudioErrorCallback? onError;
 
   /// The currently used audio codec
   final AudioCodec codec;
 
-  AudioFrameSink({@required this.codec, this.onError});
+  AudioFrameSink({required AudioCodec codec, this.onError})
+      : this.codec = assertNotPing(codec);
 }
 
-class AudioFrameSinkBase extends AudioFrameSink with _UdpErrorReceiver {
+class AudioFrameSinkTunnel extends AudioFrameSinkBase {
+  final MumbleClientBase _client;
+
+  AudioFrameSinkTunnel(
+      this._client, AudioCodec codec, int length, int voiceTarget,
+      [AudioErrorCallback? onError])
+      : super(codec, length, voiceTarget, onError);
+
+  @override
+  void sendPacket(OutgoingAudioPacket packet) {
+    _client.tunnelAudioPacket(packet);
+  }
+
+  @override
+  bool get usingTunnel => true;
+}
+
+class AudioFrameSinkUdp extends AudioFrameSinkBase with _UdpErrorReceiver {
+  final UdpTransport _transport;
+
+  AudioFrameSinkUdp(
+      this._transport, AudioCodec codec, int length, int voiceTarget,
+      [AudioErrorCallback? onError])
+      : super(codec, length, voiceTarget, onError);
+
+  @override
+  bool get usingTunnel => false;
+
+  @override
+  void sendPacket(OutgoingAudioPacket packet) {
+    _transport.writePacket(packet);
+  }
+
+  @override
+  void onUdpError(Object error, StackTrace stackTrace) {
+    addError(error, stackTrace);
+    _done.complete();
+  }
+}
+
+abstract class AudioFrameSinkBase extends AudioFrameSink {
   static final List<Uint8List> _empty = <Uint8List>[new Uint8List(0)];
 
-  final MumbleClientBase _client;
-  final UdpTransport _transport;
-  final List<List<int>> _frameBuffer;
+  final List<List<int>?> _frameBuffer;
   final int _voiceTarget;
 
   Completer<void> _done;
   int _frameBufferIndex;
-  PositionalInformation _positionalInformation;
+  PositionalInformation? _positionalInformation;
 
-  bool get usingTunnel => _client != null;
+  bool get usingTunnel;
 
-  AudioFrameSinkBase.udp(
-      AudioCodec codec, this._transport, int length, this._voiceTarget,
-      [AudioErrorCallback onError])
-      : this._client = null,
-        this._done = new Completer<void>(),
-        this._frameBuffer = new List<List<int>>(length),
+  AudioFrameSinkBase(AudioCodec codec, int length, this._voiceTarget,
+      [AudioErrorCallback? onError])
+      : this._done = new Completer<void>(),
+        this._frameBuffer = new List<List<int>?>.filled(length, null),
         this._frameBufferIndex = 0,
         super(codec: codec, onError: onError);
-
-  AudioFrameSinkBase.tunnel(
-      AudioCodec codec, this._client, int length, this._voiceTarget,
-      [AudioErrorCallback onError])
-      : this._transport = null,
-        this._done = new Completer<void>(),
-        this._frameBuffer = new List<List<int>>(length),
-        this._frameBufferIndex = 0,
-        super(codec: codec, onError: onError);
-
-  void onUdpError(dynamic error, StackTrace stackTrace) {
-    if (onError != null) {
-      onError(error, stackTrace);
-    }
-    _done.complete();
-  }
 
   @override
   void add(AudioFrame event) {
@@ -262,20 +282,23 @@ class AudioFrameSinkBase extends AudioFrameSink with _UdpErrorReceiver {
   }
 
   @override
-  void addError(Object error, [StackTrace stackTrace]) {
+  void addError(Object error, [StackTrace? stackTrace]) {
     if (onError != null) {
-      onError(error, stackTrace);
+      onError!(error, stackTrace);
     }
   }
 
   List<Uint8List> _frameSublist() {
-    List<Uint8List> frames = new List<Uint8List>(_frameBufferIndex);
+    List<Uint8List> frames = <Uint8List>[];
     for (int i = 0; i < _frameBufferIndex; i++) {
-      List<int> list = _frameBuffer[i];
-      if (list is Uint8List) {
-        frames[i] = list;
+      List<int>? list = _frameBuffer[i];
+      if (list == null) {
+        throw new StateError(
+            'The frame buffer index does not match the actuall frame buffer, this should never happen and is a critical error!');
+      } else if (list is Uint8List) {
+        frames.add(list);
       } else {
-        frames[i] = new Uint8List.fromList(list);
+        frames.add(new Uint8List.fromList(list));
       }
     }
     return frames;
@@ -286,23 +309,21 @@ class AudioFrameSinkBase extends AudioFrameSink with _UdpErrorReceiver {
     if (frames.isEmpty) {
       frames = _empty;
     }
-    AudioPacket packet = new AudioPacket.outgoing(
-        type: AudioPacketType.fromCodec(codec),
+    OutgoingAudioPacket packet = new OutgoingAudioPacket(
+        codec: codec,
         sequenceNumber: AudioClient._increaseSequenceNumber(_frameBufferIndex),
         frames: frames,
         voiceTarget: _voiceTarget,
         positionalInformation: _positionalInformation,
         endOfTransmission: eot);
     _frameBufferIndex = 0;
-    if (usingTunnel) {
-      _client.tunnelAudioPacket(packet);
-    } else {
-      _transport.writePacket(packet);
-    }
+    sendPacket(packet);
   }
 
+  void sendPacket(OutgoingAudioPacket packet);
+
   @override
-  Future addStream(Stream<AudioFrame> stream) async {
+  Future<void> addStream(Stream<AudioFrame> stream) async {
     await for (AudioFrame element in stream) {
       add(element);
     }
@@ -310,7 +331,7 @@ class AudioFrameSinkBase extends AudioFrameSink with _UdpErrorReceiver {
 
   @override
   Future close({bool gracefully: true}) async {
-    if (!(_done?.isCompleted ?? true)) {
+    if (!_done.isCompleted) {
       if (gracefully) _flush(true);
       _done.complete();
     }
@@ -321,7 +342,7 @@ class AudioFrameSinkBase extends AudioFrameSink with _UdpErrorReceiver {
 }
 
 mixin _UdpErrorReceiver {
-  void onUdpError(dynamic error, StackTrace stackTrace);
+  void onUdpError(Object error, StackTrace stackTrace);
 }
 
 class _AudioFrameStream extends Stream<AudioFrame> with _UdpErrorReceiver {
@@ -337,15 +358,16 @@ class _AudioFrameStream extends Stream<AudioFrame> with _UdpErrorReceiver {
 
   Future<void> close() => _controller.close();
 
+  /// `cancelOnError` is ignored.
   @override
-  StreamSubscription<AudioFrame> listen(void Function(AudioFrame event) onData,
-      {Function onError, void Function() onDone, bool cancelOnError}) {
+  StreamSubscription<AudioFrame> listen(void Function(AudioFrame event)? onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     return _controller.stream
         .listen(onData, onError: onError, onDone: onDone, cancelOnError: true);
   }
 
   @override
-  void onUdpError(dynamic error, StackTrace stackTrace) {
+  void onUdpError(Object error, StackTrace stackTrace) {
     _controller.addError(error, stackTrace);
   }
 }

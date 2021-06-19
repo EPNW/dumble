@@ -1,10 +1,14 @@
 import 'package:meta/meta.dart';
 
-import 'audio_client.dart';
+import 'audio/audio_client.dart';
 import 'model/channel.dart';
-import 'model/misc.dart';
 import 'model/user.dart';
 import 'model/audio.dart';
+import 'model/text_message.dart';
+import 'model/ban.dart';
+import 'model/permission.dart';
+import 'model/registered_user.dart';
+import 'model/user_stats.dart';
 
 mixin MumbleClientListener {
   /// Invoked every time a user joins the server.
@@ -16,16 +20,13 @@ mixin MumbleClientListener {
   void onChannelAdded(Channel channel);
 
   /// Invoked when a text message is received.
-  void onTextMessage(TextMessage message);
+  void onTextMessage(IncomingTextMessage message);
 
   /// Invoked with the ban list after querying it using [queryBans].
   void onBanListReceived(List<BanEntry> bans);
 
-  /// Called once syncronisation is done.
-  void onSynced();
-
   /// Invoked when an error occurs.
-  void onError(dynamic error, [StackTrace stackTrace]);
+  void onError(Object error, [StackTrace? stackTrace]);
 
   /// Invoked when the connection is closed:
   void onDone();
@@ -46,13 +47,13 @@ mixin MumbleClientListener {
 mixin UserListener {
   /// Invoked when a `user` changes (e.g. channel, comment).
   /// What changed can be seen in `changes`.
-  /// `actor` is responsible for this change and can be the user himselfe,
+  /// `actor` is responsible for this change and can be the user herself,
   /// but also a superuser or moderator, etc.
-  void onUserChanged(User user, User actor, UserChanges changes);
+  void onUserChanged(User user, User? actor, UserChanges changes);
 
   /// Called when a `user` leaves the server or is removed from it.
   /// If `actor` is not the same as `user` this was most likly a kick or even a `ban`, so there might be a `reason`.
-  void onUserRemoved(User user, User actor, String reason, bool ban);
+  void onUserRemoved(User user, User? actor, String? reason, bool? ban);
 
   /// Called when user stats are received (usually only if they were requested using [requestUserStats]).
   void onUserStats(User user, UserStats stats);
@@ -77,11 +78,11 @@ mixin AudioListener {
   /// The `voiceData` stream is closed if the `speaker` stops.
   /// The `talkMode` denotes if this transmission is received as part of normal conversation in channels or due to whispering.
   void onAudioReceived(Stream<AudioFrame> voiceData, AudioCodec codec,
-      User speaker, TalkMode talkMode);
+      User? speaker, TalkMode talkMode);
 }
 
 mixin Notifier<T> {
-  List<T> _listeners = new List<T>();
+  List<T> _listeners = <T>[];
 
   void add(T listener) {
     _listeners.add(listener);

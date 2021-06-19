@@ -1,32 +1,31 @@
 import 'dart:async';
+import 'dart:io' show SecureSocket, Socket, X509Certificate, SecurityContext;
 
 import 'package:protobuf/protobuf.dart';
-import 'streams/protobuf_stream_transformer.dart';
-import 'streams/protobuf_header_prepender.dart';
-import 'streams/protobuf_packet.dart';
-import 'dart:io' show SecureSocket, Socket, X509Certificate, SecurityContext;
-import 'package:meta/meta.dart';
-import 'audio_packet.dart';
+
+import 'audio/audio_packet.dart';
 import 'messages.dart' as Messages;
+import 'streams/protobuf_header_prepender.dart';
+import 'streams/protobuf_stream_transformer.dart';
+import 'streams/protobuf_packet.dart';
 
 /// Return `true` to trust the certificate or `false` to consider it bad.
 typedef bool OnBadCertificate(X509Certificate certificate);
 
-class Connection {
-  ProtobufHeaderPrepender _out;
+class Connection extends StreamView<ProtobufPacket> {
+  final ProtobufHeaderPrepender _out;
 
-  final String host;
-  final int port;
-  final SecurityContext context;
+  Connection._(this._out, Stream<ProtobufPacket> base) : super(base);
 
-  Connection({@required this.host, @required this.port, this.context});
-
-  Future<Stream<ProtobufPacket>> connect(
-      {OnBadCertificate onBadCertificate}) async {
+  static Future<Connection> connect(
+      {required String host,
+      required int port,
+      SecurityContext? context,
+      OnBadCertificate? onBadCertificate}) async {
     Socket socket = await SecureSocket.connect(host, port,
         onBadCertificate: onBadCertificate, context: context);
-    _out = new ProtobufHeaderPrepender(socket);
-    return socket.transform(new ProtobufStreamTransformer());
+    return new Connection._(new ProtobufHeaderPrepender(socket),
+        socket.transform(new ProtobufStreamTransformer()));
   }
 
   Future<void> close() async {

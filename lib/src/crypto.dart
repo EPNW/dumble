@@ -1,23 +1,22 @@
 import 'dart:typed_data';
 
-import 'package:meta/meta.dart';
 import 'package:pointycastle/pointycastle.dart';
 
-import 'model/misc.dart';
+import 'model/crypto.dart';
 
 const int AES_BLOCK_SIZE = 16; // 16 bytes == 128 bits
 const int SHIFTBITS = 7;
 
 class CryptionResult {
   final Uint8List tag, data;
-  const CryptionResult({@required this.tag, @required this.data});
+  const CryptionResult({required this.tag, required this.data});
 }
 
 class Ocb2Aes128 {
   final BlockCipher _aesEcb128Encyrption;
   final BlockCipher _aesEcb128Decryption;
 
-  Ocb2Aes128({@required Uint8List key})
+  Ocb2Aes128({required Uint8List key})
       : this._aesEcb128Encyrption = new BlockCipher('AES/ECB')
           ..init(true, new KeyParameter(key)),
         this._aesEcb128Decryption = new BlockCipher('AES/ECB')
@@ -30,8 +29,8 @@ class Ocb2Aes128 {
       _aesEcb128Decryption.process(ciphertext);
 
   CryptionResult encrypt(
-      {@required Uint8List plaintext,
-      @required CryptState state,
+      {required Uint8List plaintext,
+      required CryptState state,
       bool increaseClientNonce: true}) {
     if (increaseClientNonce) {
       state.increaseClientNonce();
@@ -78,9 +77,9 @@ class Ocb2Aes128 {
   }
 
   CryptionResult decrypt(
-      {@required Uint8List ciphertext,
-      @required int serverNonceLsb,
-      @required CryptState state,
+      {required Uint8List ciphertext,
+      required int serverNonceLsb,
+      required CryptState state,
       bool updateServerNonce: true}) {
     if (updateServerNonce) {
       state.updateServerNonce(serverNonceLsb);
