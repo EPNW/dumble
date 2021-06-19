@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import '../var_int.dart';
 import '../messages.dart' as Messages;
 import '../streams/protobuf_packet.dart';
@@ -69,76 +71,6 @@ class IncomingAudioPacket extends AudioPacket {
       required int lengthInBytes})
       : super(lengthInBytes: lengthInBytes);
 
-  /// Returns either a [IncomingAudioPacket] or a [PingPacket].
-  static AudioPacket decodeIncoming({required Uint8List data}) {
-    ByteData bytes =
-        data.buffer.asByteData(data.offsetInBytes, data.lengthInBytes);
-    int msb = bytes.getUint8(0);
-    int codecInt = (msb & 0xE0) >> 5;
-    AudioCodec codec;
-    if (0 <= codecInt && codecInt < AudioCodec.values.length) {
-      codec = AudioCodec.values[codecInt];
-    } else {
-      throw new ArgumentError(
-          'Bad data! Value $codecInt from msb (${msb.toRadixString(16)}) does not represent a valid codec!');
-    }
-    if (codec == AudioCodec.ping) {
-      return new PingPacket._(
-          pingTimestamp: bytes.getVarInt(1).value,
-          lengthInBytes: bytes.lengthInBytes,
-          incoming: true);
-    } else {
-      int target = msb & 0x1F;
-      VarIntResult sessionId = bytes.getVarInt(1);
-      VarIntResult sequenceNumber =
-          bytes.getVarInt(1 + sessionId.lengthInBytes);
-      int index = 1 + sessionId.lengthInBytes + sequenceNumber.lengthInBytes;
-      bool eot = false;
-      List<Uint8List> frames = <Uint8List>[];
-      if (codec == AudioCodec.opus) {
-        VarIntResult header = bytes.getVarInt(index);
-        index += header.lengthInBytes;
-        eot = (header.value & 0x2000) == 0x2000;
-        int length = header.value & 0x1FFF;
-        frames
-            .add(bytes.buffer.asUint8List(bytes.offsetInBytes + index, length));
-        index += length;
-      } else {
-        bool hasNext = true;
-        while (hasNext) {
-          int header = bytes.getUint8(index);
-          hasNext = (header & 0x80) == 0x80;
-          index++;
-          int length = header & 0x7F;
-          if (length > 0) {
-            frames.add(
-                bytes.buffer.asUint8List(bytes.offsetInBytes + index, length));
-            index += length;
-          } else {
-            eot = true;
-          }
-        }
-      }
-      PositionalInformation? pos;
-      if (index < bytes.lengthInBytes) {
-        pos = new PositionalInformation(
-            x: bytes.getFloat32(index),
-            y: bytes.getFloat32(index + 4),
-            z: bytes.getFloat32(index + 8));
-        index += 12;
-      }
-      return new IncomingAudioPacket._(
-          codec: codec,
-          target: target,
-          sequenceNumber: sequenceNumber.value,
-          frames: frames,
-          endOfTransmission: eot,
-          positionalInformation: pos,
-          sessionId: sessionId.value,
-          lengthInBytes: bytes.lengthInBytes);
-    }
-  }
-
   @override
   Map<String, Object> jsonMap() {
     Map<String, Object> map = new Map<String, Object>();
@@ -154,6 +86,75 @@ class IncomingAudioPacket extends AudioPacket {
     map['totalFramesSize'] = frames.fold<int>(
         0, (int size, Uint8List frame) => size + frame.lengthInBytes);
     return map;
+  }
+}
+
+/// Returns either a [IncomingAudioPacket] or a [PingPacket].
+@protected
+AudioPacket decodeIncoming({required Uint8List data}) {
+  ByteData bytes =
+      data.buffer.asByteData(data.offsetInBytes, data.lengthInBytes);
+  int msb = bytes.getUint8(0);
+  int codecInt = (msb & 0xE0) >> 5;
+  AudioCodec codec;
+  if (0 <= codecInt && codecInt < AudioCodec.values.length) {
+    codec = AudioCodec.values[codecInt];
+  } else {
+    throw new ArgumentError(
+        'Bad data! Value $codecInt from msb (${msb.toRadixString(16)}) does not represent a valid codec!');
+  }
+  if (codec == AudioCodec.ping) {
+    return new PingPacket._(
+        pingTimestamp: bytes.getVarInt(1).value,
+        lengthInBytes: bytes.lengthInBytes,
+        incoming: true);
+  } else {
+    int target = msb & 0x1F;
+    VarIntResult sessionId = bytes.getVarInt(1);
+    VarIntResult sequenceNumber = bytes.getVarInt(1 + sessionId.lengthInBytes);
+    int index = 1 + sessionId.lengthInBytes + sequenceNumber.lengthInBytes;
+    bool eot = false;
+    List<Uint8List> frames = <Uint8List>[];
+    if (codec == AudioCodec.opus) {
+      VarIntResult header = bytes.getVarInt(index);
+      index += header.lengthInBytes;
+      eot = (header.value & 0x2000) == 0x2000;
+      int length = header.value & 0x1FFF;
+      frames.add(bytes.buffer.asUint8List(bytes.offsetInBytes + index, length));
+      index += length;
+    } else {
+      bool hasNext = true;
+      while (hasNext) {
+        int header = bytes.getUint8(index);
+        hasNext = (header & 0x80) == 0x80;
+        index++;
+        int length = header & 0x7F;
+        if (length > 0) {
+          frames.add(
+              bytes.buffer.asUint8List(bytes.offsetInBytes + index, length));
+          index += length;
+        } else {
+          eot = true;
+        }
+      }
+    }
+    PositionalInformation? pos;
+    if (index < bytes.lengthInBytes) {
+      pos = new PositionalInformation(
+          x: bytes.getFloat32(index),
+          y: bytes.getFloat32(index + 4),
+          z: bytes.getFloat32(index + 8));
+      index += 12;
+    }
+    return new IncomingAudioPacket._(
+        codec: codec,
+        target: target,
+        sequenceNumber: sequenceNumber.value,
+        frames: frames,
+        endOfTransmission: eot,
+        positionalInformation: pos,
+        sessionId: sessionId.value,
+        lengthInBytes: bytes.lengthInBytes);
   }
 }
 

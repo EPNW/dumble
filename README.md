@@ -37,7 +37,7 @@ This package was designed for servers using Mumble 1.4, but some features are si
 ## Further Null safety refinements
 While the initial migration to null safety was done in version 0.8.0, there are some things that could be better and will be refined in the future:
 
-* We are currently using ! after a null check to promote instance variables, but we should switch to using local copies as suggested by [effective-dart](https://dart.dev/guides/language/effective-dart/usage#consider-copying-a-nullable-field-to-a-local-variable-to-enable-type-promotion).
+* We are currently using `!` after a null check to promote instance variables, but we should switch to using local copies as suggested by [effective-dart](https://dart.dev/guides/language/effective-dart/usage#consider-copying-a-nullable-field-to-a-local-variable-to-enable-type-promotion).
 * ServerInfo contains a lot of nullable fields right now. It might be possible to make them not-nullable if we could guarantee that a corresponding proto message is received while syncing, just like we are doing it for the clients crypt state and self fields. We have to double check that with the mumble protocol.
 * The same goes for channels and users: What fields can actually be null? We need to check the mumble protocol on that. The problem here is that the Mumble.proto marks everything as optional but depending on the context, certian fields have to be there. To conclude, a deeper understanding of the protocol is needed to find the optimal solution here.
 

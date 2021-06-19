@@ -227,7 +227,7 @@ class _UdpTransportBase extends UdpTransport {
   AudioPacket? _decodeDatagram(Datagram datagram) {
     try {
       if (datagram.address == remoteHost && datagram.port == remotePort) {
-        return IncomingAudioPacket.decodeIncoming(data: _decode(datagram.data));
+        return decodeIncoming(data: _decode(datagram.data));
       } else {
         return null;
       }

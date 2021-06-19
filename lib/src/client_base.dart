@@ -288,7 +288,7 @@ class MumbleClientBase extends MumbleClient
   }
 
   void _handleUdpTunnel(ProtobufPacket packet) {
-    AudioPacket audio = IncomingAudioPacket.decodeIncoming(data: packet.data);
+    AudioPacket audio = decodeIncoming(data: packet.data);
     if (audio is IncomingAudioPacket) {
       // If it is guaranteed that no voice packet is transmitted before syncing is done
       // we could use the audio field, but I am not sure about that, so we are using the
