@@ -1,4 +1,4 @@
-# [0.8.0]
+# [0.8.0] - 19.06.2021
   * Null safety (but not as greate as it could be)
     * See the [README.md](./README.md) why futher null safety refinements are desired 
   * Targeting Mumble 1.4
