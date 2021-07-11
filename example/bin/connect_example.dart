@@ -5,17 +5,24 @@ import 'package:dumble_examples/connection_options.dart';
 
 Future<void> main() async {
   MumbleClient client = await MumbleClient.connect(
-      options: defaulConnectionOptions,
+      options: defaulConnectionOptionsWithCertificate,
       onBadCertificate: (X509Certificate certificate) {
         //Accept every certificate
         return true;
       });
-  client.add(new MumbleExampleCallback(client));
+  MumbleExampleCallback callback = new MumbleExampleCallback(client);
+  client.add(callback);
   print('Client synced with server!');
   print('Listing channels...');
   print(client.getChannels());
   print('Listing users...');
   print(client.getUsers());
+  // Watch all users that are already on the server
+  // New users will reported to the callback (because of line 14) and we will
+  // watch these new users in onUserAdded below
+  client.getUsers().values.forEach((User element) => element.add(callback));
+  // Also, watch self
+  client.self.add(callback);
   // Set a comment for us
   client.self.setComment(comment: 'I\'m a bot!');
 // Create a channel. If the channel is succesfully created, our callback is invoked.
@@ -72,6 +79,7 @@ class MumbleExampleCallback with MumbleClientListener, UserListener {
 
   @override
   void onUserChanged(User? user, User? actor, UserChanges changes) {
+    print('User $user changed $changes');
     // The user changed
     if (changes.channel) {
       // ...his channel

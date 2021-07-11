@@ -534,16 +534,16 @@ class MumbleClientBase extends MumbleClient
     if (!message.hasSession()) {
       throw new ArgumentError('Bad message, session id missing!');
     }
-    Channel? channel = _getChannel(message.hasChannelId(), message.channelId) ??
-        _lateRootChannel;
-    if (channel == null) {
-      throw new StateError(
-          'Channel is null and there is no root channel! This should never happen!');
-    }
+    Channel? channel = _getChannel(message.hasChannelId(), message.channelId);
     final bool created;
     final User user;
     User? userOrNull = _getUserOrSelf(true, message.session);
     if (userOrNull == null) {
+      channel ??= _lateRootChannel;
+      if (channel == null) {
+        throw new StateError(
+            'Channel is null for a new user and there is no root channel! This should never happen!');
+      }
       user = createNewUser(
           client: this, sessionId: message.session, channel: channel);
       _users[message.session] = user;

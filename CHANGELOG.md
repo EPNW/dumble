@@ -1,8 +1,12 @@
+# [0.8.2] - 11.07.2021
+  * Some typos
+  * Fixed a bug where all changes on a user (e.g. comment) were also detected as channel changes
+
 # [0.8.1] - 19.06.2021
   * Minor internal fixes
 
 # [0.8.0] - 19.06.2021
-  * Null safety (but not as greate as it could be)
+  * Null safety (but not as great as it could be)
     * See the [README.md](./README.md) why futher null safety refinements are desired 
   * Targeting Mumble 1.4
     * We are targeting the `Mumble.proto` from [mumble-voip/mumble#27dbee8e620877f9a1668b1d58c7269a48c7e229](https://github.com/mumble-voip/mumble/blob/27dbee8e620877f9a1668b1d58c7269a48c7e229/src/Mumble.proto)
