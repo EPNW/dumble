@@ -272,17 +272,25 @@ class User with Notifier<UserListener>, JsonString {
         .forEach((UserListener listener) => listener.onUserStats(this, stats));
   }
 
-  void setPrioritySpeaker({required bool prioritySpeaker}) => _client
-      .writeMessage(new Proto.UserState()..prioritySpeaker = prioritySpeaker);
+  void setPrioritySpeaker({required bool prioritySpeaker}) =>
+      _client.writeMessage(new Proto.UserState()
+        ..prioritySpeaker = prioritySpeaker
+        ..session = session);
 
   void setSuppress({required bool suppress}) =>
-      _client.writeMessage(new Proto.UserState()..suppress = suppress);
+      _client.writeMessage(new Proto.UserState()
+        ..suppress = suppress
+        ..session = session);
 
   void setMute({required bool mute}) =>
-      _client.writeMessage(new Proto.UserState()..mute = mute);
+      _client.writeMessage(new Proto.UserState()
+        ..mute = mute
+        ..session = session);
 
   void setDeaf({required bool deaf}) =>
-      _client.writeMessage(new Proto.UserState()..deaf = deaf);
+      _client.writeMessage(new Proto.UserState()
+        ..deaf = deaf
+        ..session = session);
 
   void kickUser({String? reason}) {
     Proto.UserRemove msg = new Proto.UserRemove()
