@@ -1,3 +1,6 @@
+# [0.8.4] - 13.07.2021
+  * Fixed a bug where `close`ing a client multiple times causes an exception
+
 # [0.8.3] - 12.07.2021
   * Fixed a bug where actions on a user (e.g. muting) targeted `self` instead
 

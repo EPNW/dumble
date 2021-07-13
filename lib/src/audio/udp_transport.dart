@@ -103,7 +103,12 @@ class _UdpTransportBase extends UdpTransport {
 
   @override
   void close() {
-    _pinging?.complete();
+    Completer<void>? pinging = _pinging;
+    if (pinging != null) {
+      if (!pinging.isCompleted) {
+        pinging.complete();
+      }
+    }
   }
 
   @override

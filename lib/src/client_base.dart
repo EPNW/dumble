@@ -101,7 +101,9 @@ class MumbleClientBase extends MumbleClient
   @override
   Future<void> close() async {
     await _lateAudio?.close();
-    _pinging.complete();
+    if (!_pinging.isCompleted) {
+      _pinging.complete();
+    }
     await _connection.close();
   }
 
