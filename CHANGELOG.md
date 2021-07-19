@@ -1,3 +1,6 @@
+# [0.8.5] - 19.07.2021
+  * Introduced [`AudioClient.incomingAudioStreamTimeout`](https://pub.dev/documentation/dumble/latest/dumble/AudioClient/incomingAudioStreamTimeout.html) to close incomig audio streams if no next frame is received, but no end-frame neither
+
 # [0.8.4] - 13.07.2021
   * Fixed a bug where `close`ing a client multiple times causes an exception
 

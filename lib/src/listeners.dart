@@ -75,8 +75,13 @@ mixin AudioListener {
   /// Invoked with a stream of [AudioFrame]s containing voice data.
   ///
   /// The frames are encoded using `codec` and originate from `speaker`.
-  /// The `voiceData` stream is closed if the `speaker` stops.
   /// The `talkMode` denotes if this transmission is received as part of normal conversation in channels or due to whispering.
+  ///
+  /// The `voiceData` stream is closed if the mumble server properly ends the current transmission (if `speaker` stops speaking),
+  /// or if there are no data for this transmission during a duration of [AudioClient.incomingAudioStreamTimeout].
+  /// The later usually happens if a mumble user is forcefully muted by the mumble server while still speaking.
+  /// The mumble server will then not send further voice packets to the other users, but will also not send a proper
+  /// end frame, so this timeout is needed to decide whether to close the stream.
   void onAudioReceived(Stream<AudioFrame> voiceData, AudioCodec codec,
       User? speaker, TalkMode talkMode);
 }

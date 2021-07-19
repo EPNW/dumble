@@ -34,6 +34,9 @@ class ConnectionOptions with JsonString {
   /// True if this client supports opus.
   final bool opus;
 
+  /// See [AudioClient.incomingAudioStreamTimeout].
+  final Duration? incomingAudioStreamTimeout;
+
   /// Configures [ConnectionOptions].
   ///
   /// See the matching field documentation for more information about the parameters.
@@ -45,7 +48,8 @@ class ConnectionOptions with JsonString {
       this.password,
       this.opus: true,
       this.tokens = const <String>[],
-      this.celtVersions = const <int>[]});
+      this.celtVersions = const <int>[],
+      this.incomingAudioStreamTimeout = const Duration(milliseconds: 500)});
 
   @override
   Map<String, Object> jsonMap() {
@@ -58,6 +62,9 @@ class ConnectionOptions with JsonString {
       ..['opus'] = opus;
     if (password != null) {
       map['password'] = password!;
+    }
+    if (incomingAudioStreamTimeout != null) {
+      map['incomingAudioStreamTimeout'] = incomingAudioStreamTimeout!;
     }
     return map;
   }

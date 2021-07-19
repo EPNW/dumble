@@ -14,6 +14,8 @@ final ConnectionOptions defaulConnectionOptionsWithCertificate =
         name: defaulConnectionOptions.name,
         port: defaulConnectionOptions.port,
         password: defaulConnectionOptions.password,
+        incomingAudioStreamTimeout:
+            defaulConnectionOptions.incomingAudioStreamTimeout,
         context: new SecurityContext(withTrustedRoots: true)
           ..usePrivateKey('./assets/dumble_key.pem')
           ..useCertificateChain('./assets/dumble_cert.pem'));

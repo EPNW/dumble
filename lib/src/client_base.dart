@@ -163,7 +163,11 @@ class MumbleClientBase extends MumbleClient
               '\r\nThis should be impossible!');
     }
     client._lateAudio = await AudioClientBase.withRemoteHostLookup(
-        client, useUdp, localUdpBindAddress, localUdpBindPort);
+        client,
+        useUdp,
+        localUdpBindAddress,
+        localUdpBindPort,
+        options.incomingAudioStreamTimeout);
     return client;
   }
 

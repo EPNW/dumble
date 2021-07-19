@@ -38,6 +38,24 @@ abstract class AudioClient with Notifier<AudioListener> {
     return first;
   }
 
+  /// The maximum time between the receiving of two audio frames before a
+  /// [AudioListener.onAudioReceived] `voiceData` stream will be closed.
+  ///
+  /// See the documentation of [AudioListener.onAudioReceived] for additional
+  /// information.
+  ///
+  /// If set to null during construction (by setting the same-named parameter in
+  /// the [ConnectionOptions] passed to [MumbleClient.connect] to null), no timeout
+  /// checks will be performed.
+  ///
+  /// The default value of 500ms (see [ConnectionOptions.incomingAudioStreamTimeout])
+  /// is relative high. Some applications may want to use a lower value.
+  ///
+  /// *Note*: Due to implementation, the actual maximum duration between
+  /// the receiving of two audio frames is 1.5 times the given value. A higher
+  /// precision would require mroe computational power, so this tradeof was made.
+  Duration? get incomingAudioStreamTimeout;
+
   /// If this client should use udp.
   bool get shouldUseUdp;
 
@@ -75,6 +93,7 @@ class AudioClientBase extends AudioClient {
   final List<_UdpErrorReceiver> _overUdp;
   final List<AudioFrameSink> _sinks;
   final Map<int, _AudioFrameStream> _streams;
+  late final Timer? _timeoutTimer;
 
   bool _udpAvailable;
 
@@ -87,8 +106,15 @@ class AudioClientBase extends AudioClient {
   @override
   bool get shouldUseUdp => _udpTransport != null;
 
-  static Future<AudioClientBase> withRemoteHostLookup(MumbleClientBase client,
-      bool shouldUseUdp, Object? localBindAddress, int localPort) async {
+  @override
+  final Duration? incomingAudioStreamTimeout;
+
+  static Future<AudioClientBase> withRemoteHostLookup(
+      MumbleClientBase client,
+      bool shouldUseUdp,
+      Object? localBindAddress,
+      int localPort,
+      Duration? incomingAudioStreamTimeout) async {
     UdpTransport? transport;
     if (shouldUseUdp) {
       transport = await UdpTransport.withRemoteHostLookup(
@@ -98,14 +124,25 @@ class AudioClientBase extends AudioClient {
           remoteHost: client.options.host,
           remotePort: client.options.port);
     }
-    return new AudioClientBase(client, transport);
+    return new AudioClientBase(client, transport, incomingAudioStreamTimeout);
   }
 
-  AudioClientBase(this._client, this._udpTransport)
+  AudioClientBase(
+      this._client, this._udpTransport, this.incomingAudioStreamTimeout)
       : this._udpAvailable = false,
         this._overUdp = <_UdpErrorReceiver>[],
         this._streams = new Map<int, _AudioFrameStream>(),
         this._sinks = <AudioFrameSink>[] {
+    if (incomingAudioStreamTimeout != null) {
+      // By dividing by 2 (and saving the last checks result, see the check method),
+      // we can achive precision of 1 1/2. Likewise, by dividing by n we could
+      // achive precision of 1 1/n if we would also store the last n check results.
+      // 2 was choosen as suitable tradeof.
+      _timeoutTimer = new Timer.periodic(
+          incomingAudioStreamTimeout! ~/ 2, _checkIncommingStreamTimeouts);
+    } else {
+      _timeoutTimer = null;
+    }
     if (shouldUseUdp) {
       _udpTransport!
           .useUdp(onResyncRequest: _client.requestCryptStateResync)
@@ -115,8 +152,21 @@ class AudioClientBase extends AudioClient {
     }
   }
 
+  void _checkIncommingStreamTimeouts(Timer t) {
+    Map<int, _AudioFrameStream> eot = new Map<int, _AudioFrameStream>();
+    for (MapEntry<int, _AudioFrameStream> entry in _streams.entries) {
+      if (!entry.value.check()) {
+        eot[entry.key] = entry.value;
+      }
+    }
+    for (MapEntry<int, _AudioFrameStream> entry in eot.entries) {
+      _endOfTransmission(entry.value, entry.key);
+    }
+  }
+
   @override
   Future<void> close() async {
+    _timeoutTimer?.cancel();
     List<Future> closeFutures = <Future>[];
     for (Stream<AudioFrame> stream in _streams.values) {
       closeFutures.add((stream as _AudioFrameStream).close());
@@ -169,9 +219,13 @@ class AudioClientBase extends AudioClient {
           frame: frame, positionalInformation: packet.positionalInformation));
     }
     if (packet.endOfTransmission) {
-      stream.close();
-      _streams.remove(packet.sessionId);
+      _endOfTransmission(stream, packet.sessionId);
     }
+  }
+
+  void _endOfTransmission(_AudioFrameStream stream, int sessionId) {
+    stream.close();
+    _streams.remove(sessionId);
   }
 
   @override
@@ -348,12 +402,29 @@ mixin _UdpErrorReceiver {
 class _AudioFrameStream extends Stream<AudioFrame> with _UdpErrorReceiver {
   final StreamController<AudioFrame> _controller;
   final int userId;
+  int _currentAdd;
+  int _lastCheckAdd;
+  bool _lastCheckResult;
 
   _AudioFrameStream(this.userId)
-      : this._controller = new StreamController<AudioFrame>.broadcast();
+      : this._controller = new StreamController<AudioFrame>.broadcast(),
+        this._currentAdd = 0,
+        this._lastCheckAdd = 0,
+        this._lastCheckResult = true;
 
   void add(AudioFrame packet) {
+    _currentAdd++;
     _controller.add(packet);
+  }
+
+  // Returns true if during two consecutive checks at least one audio frame was received.
+  bool check() {
+    int _sinceLastCheck = _currentAdd - _lastCheckAdd;
+    _lastCheckAdd = _currentAdd;
+    bool thisCheckResult = _sinceLastCheck > 0;
+    bool overallResult = thisCheckResult || _lastCheckResult;
+    _lastCheckResult = thisCheckResult;
+    return overallResult;
   }
 
   Future<void> close() => _controller.close();
