@@ -299,7 +299,7 @@ class MumbleClientBase extends MumbleClient
       // If it is guaranteed that no voice packet is transmitted before syncing is done
       // we could use the audio field, but I am not sure about that, so we are using the
       // _lateAudio and by this, discarding every packet until we are synced.
-      // TODO test if we could are always synced by now and can use audio instead of _lateAudio
+      // TODO test if we are always synced by now and can use audio instead of _lateAudio
       _lateAudio?.feed(audio, false);
     } else {
       throw new ArgumentError(

@@ -14,13 +14,28 @@ class AudioFrame with JsonString {
   /// The frame data, encoded according to mumbles frame [specification](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html).
   final Uint8List frame;
 
+  /// The sequence number of this frame.
+  ///
+  /// Copied from the [mumble docs](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html):
+  /// The sequence number is used to maintain the packet order when the audio data is
+  /// transported over unreliable transports such as UDP.
+  ///
+  /// *Note*: This field is the frames sequence number, not the packets sequence number! The docs above
+  /// describe the packet sequence number. The frame sequence number is calculated by adding its frame
+  /// index from within the packet (which might contain multiple frames) to the sequence number of the packet.
+  final int sequenceNumber;
+
   /// Optional positional information for this frame.
   final PositionalInformation? positionalInformation;
-  const AudioFrame({required this.frame, this.positionalInformation});
+  const AudioFrame(
+      {required this.frame,
+      this.positionalInformation,
+      required this.sequenceNumber});
 
   @override
   Map<String, Object> jsonMap() => new Map<String, Object>()
     ..['frame'] = frame
+    ..['sequenceNumber'] = sequenceNumber
     ..['position'] = positionalInformation.toString();
 }
 
@@ -214,9 +229,13 @@ class AudioClientBase extends AudioClient {
             stream, packet.codec, user, TalkMode.values[packet.target]);
       }
     }
+    int sequenceNumber = packet.sequenceNumber;
     for (Uint8List frame in packet.frames) {
       stream.add(new AudioFrame(
-          frame: frame, positionalInformation: packet.positionalInformation));
+          sequenceNumber: sequenceNumber,
+          frame: frame,
+          positionalInformation: packet.positionalInformation));
+      sequenceNumber++;
     }
     if (packet.endOfTransmission) {
       _endOfTransmission(stream, packet.sessionId);

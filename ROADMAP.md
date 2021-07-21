@@ -3,3 +3,4 @@ The following steps need to be done before releasing version 1.0.0 of this packa
 * ACL System
 * Null safety refinements
 * More documentation
+* Fix ping stats
