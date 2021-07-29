@@ -1,9 +1,12 @@
+# [0.8.7] - 29.07.2021
+  * Created `AudioFrame.outgoing` as dedicated constructor for outgoing audio frames
+
 # [0.8.6] - 29.07.2021
-* Depend on `dart >= 2.13` so we can use the new `Stream.timeout` and improved the audio stream timeout detection introduced in `0.8.5`
-* Made `AudioFrame.sequenceNumber` part of the public API
-* Introduced `ConnectionOptions.pingTimeout` and throwing a `TimeoutException` now if it is violated
-* Changed and documented error handling better
-  * `PermissionDeniedException` are no longer thrown but delivered by a callback, since a mumble server will continue to server a client, even if the client did something that resulted in a permission error
+  * Depend on `dart >= 2.13` so we can use the new `Stream.timeout` and improved the audio stream timeout detection introduced in `0.8.5`
+  * Made `AudioFrame.sequenceNumber` part of the public API
+  * Introduced `ConnectionOptions.pingTimeout` and throwing a `TimeoutException` now if it is violated
+  * Changed and documented error handling better
+    * `PermissionDeniedException` are no longer thrown but delivered by a callback, since a mumble server will continue to server a client, even if the client did something that resulted in a permission error
 
 # [0.8.5] - 19.07.2021
   * Introduced [`AudioClient.incomingAudioStreamTimeout`](https://pub.dev/documentation/dumble/latest/dumble/AudioClient/incomingAudioStreamTimeout.html) to close incomig audio streams if no next frame is received, but no end-frame neither

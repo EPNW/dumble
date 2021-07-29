@@ -31,8 +31,6 @@ Future<void> main() async {
       channels: channels,
       application: Application.voip);
   AudioFrameSink audioOutput = client.audio.sendAudio(codec: AudioCodec.opus);
-  // We need this artificial sequence number for simulating audio recording, see below.
-  int sequenceNumber = 0;
   await simulateAudioRecording() // This simulates recording by reading from a file
       .asyncMap((List<int> bytes) async {
         // We need to wait a bit since reading from a file is "faster than realtime".
@@ -44,9 +42,7 @@ Future<void> main() async {
         return bytes;
       })
       .transform(encoder)
-      // Since we are creating artificial frames we need to add a sequence number
-      .map((Uint8List audioBytes) =>
-          new AudioFrame(frame: audioBytes, sequenceNumber: sequenceNumber++))
+      .map((Uint8List audioBytes) => new AudioFrame.outgoing(frame: audioBytes))
       .pipe(audioOutput);
 }
 

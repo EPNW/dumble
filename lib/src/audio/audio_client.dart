@@ -16,6 +16,9 @@ class AudioFrame with JsonString {
 
   /// The sequence number of this frame.
   ///
+  /// Will be -1 if this AudioFrame was created with the [AudioFrame.outgoing] constructor,
+  /// and only contain a useful value if this is an incoming frame.
+  ///
   /// Copied from the [mumble docs](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html):
   /// The sequence number is used to maintain the packet order when the audio data is
   /// transported over unreliable transports such as UDP.
@@ -27,10 +30,20 @@ class AudioFrame with JsonString {
 
   /// Optional positional information for this frame.
   final PositionalInformation? positionalInformation;
-  const AudioFrame(
+
+  const AudioFrame._incoming(
       {required this.frame,
       this.positionalInformation,
       required this.sequenceNumber});
+
+  /// Creates a frame that should be added to an [AudioFrameSink] to send it to the mumble server.
+  ///
+  /// The [sequenceNumber] of such an outgoing frame is not known until actuall sending and
+  /// thus will always be -1.
+  const AudioFrame.outgoing({
+    required this.frame,
+    this.positionalInformation,
+  }) : this.sequenceNumber = -1;
 
   @override
   Map<String, Object> jsonMap() => new Map<String, Object>()
@@ -204,7 +217,7 @@ class AudioClientBase extends AudioClient {
     }
     int sequenceNumber = packet.sequenceNumber;
     for (Uint8List frame in packet.frames) {
-      stream.add(new AudioFrame(
+      stream.add(new AudioFrame._incoming(
           sequenceNumber: sequenceNumber,
           frame: frame,
           positionalInformation: packet.positionalInformation));
