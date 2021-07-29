@@ -15,7 +15,7 @@ export 'src/model/audio.dart'
 export 'src/model/ban.dart' show BanEntry;
 export 'src/model/channel.dart' show Channel, ChannelChanges;
 export 'src/model/crypto.dart' show NonceOutOfSyncException, CryptState;
-export 'src/model/exceptions.dart'
+export 'src/model/model_exceptions.dart'
     show PermissionDeniedException, RejectException, DenyType, RejectType;
 export 'src/model/permission.dart' show Permission;
 export 'src/model/registered_user.dart' show RegisteredUser;
@@ -42,3 +42,4 @@ export 'src/listeners.dart'
         MumbleClientListener,
         Notifier,
         UserListener;
+export 'src/exceptions.dart' show ProtocolException, UnhandeledError;

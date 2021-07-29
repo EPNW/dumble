@@ -3,11 +3,12 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-import '../var_int.dart';
+import '../utils/var_int.dart';
 import '../messages.dart' as Messages;
 import '../streams/protobuf_packet.dart';
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 import '../model/audio.dart';
+import '../exceptions.dart';
 
 class AudioTunnelPacket extends ProtobufPacket {
   static final Uint8List _empty = new Uint8List(0);
@@ -100,7 +101,7 @@ AudioPacket decodeIncoming({required Uint8List data}) {
   if (0 <= codecInt && codecInt < AudioCodec.values.length) {
     codec = AudioCodec.values[codecInt];
   } else {
-    throw new ArgumentError(
+    throw new ProtocolException(
         'Bad data! Value $codecInt from msb (${msb.toRadixString(16)}) does not represent a valid codec!');
   }
   if (codec == AudioCodec.ping) {
@@ -270,7 +271,7 @@ abstract class AudioPacket with JsonString {
         endOfTransmission = packet.endOfTransmission;
         positionalInformation = packet.positionalInformation;
       } else {
-        throw new ArgumentError(
+        throw new ProtocolException(
             'packet is not a OutgoingAudioPacket, IncomingAudioPacket or PingPacket!');
       }
 

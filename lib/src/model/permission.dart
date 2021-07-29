@@ -1,4 +1,4 @@
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 
 class Permission with JsonString {
   // Values from https://github.com/mumble-voip/mumble/blob/master/src/ACL.h

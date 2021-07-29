@@ -1,4 +1,4 @@
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 import 'package:meta/meta.dart';
 import '../generated/Mumble.pb.dart' as Proto;
 

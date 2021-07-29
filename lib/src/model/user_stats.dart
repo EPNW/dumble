@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-import '../utils.dart' show JsonString, ByteAddress;
+import '../utils/utils.dart' show JsonString, ByteAddress;
 import '../generated/Mumble.pb.dart' as Proto;
 import 'stats.dart';
 

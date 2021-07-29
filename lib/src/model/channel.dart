@@ -7,7 +7,7 @@ import 'package:meta/meta.dart';
 import '../generated/Mumble.pb.dart' as Proto;
 import 'permission.dart';
 import 'voice_target.dart';
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 
 @protected
 const ChannelChanges linksChanged = const ChannelChanges._(

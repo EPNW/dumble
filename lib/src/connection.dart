@@ -14,8 +14,12 @@ typedef bool OnBadCertificate(X509Certificate certificate);
 
 class Connection extends StreamView<ProtobufPacket> {
   final ProtobufHeaderPrepender _out;
+  final Socket _socket;
 
-  Connection._(this._out, Stream<ProtobufPacket> base) : super(base);
+  Connection._(Socket socket)
+      : this._socket = socket,
+        this._out = new ProtobufHeaderPrepender(socket),
+        super(socket.transform(new ProtobufStreamTransformer()));
 
   static Future<Connection> connect(
       {required String host,
@@ -24,12 +28,13 @@ class Connection extends StreamView<ProtobufPacket> {
       OnBadCertificate? onBadCertificate}) async {
     Socket socket = await SecureSocket.connect(host, port,
         onBadCertificate: onBadCertificate, context: context);
-    return new Connection._(new ProtobufHeaderPrepender(socket),
-        socket.transform(new ProtobufStreamTransformer()));
+    return new Connection._(
+      socket,
+    );
   }
 
-  Future<void> close() async {
-    await _out.close();
+  void destroy() {
+    _socket.destroy();
   }
 
   void writeMessage<T extends GeneratedMessage>(T message) {

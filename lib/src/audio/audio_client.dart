@@ -7,7 +7,7 @@ import '../listeners.dart';
 import '../model/audio.dart';
 import '../model/user.dart';
 import 'udp_transport.dart';
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 
 /// An AudioFrame contains encoded audio data and optional positional information.
 class AudioFrame with JsonString {
@@ -65,10 +65,6 @@ abstract class AudioClient with Notifier<AudioListener> {
   ///
   /// The default value of 500ms (see [ConnectionOptions.incomingAudioStreamTimeout])
   /// is relative high. Some applications may want to use a lower value.
-  ///
-  /// *Note*: Due to implementation, the actual maximum duration between
-  /// the receiving of two audio frames is 1.5 times the given value. A higher
-  /// precision would require mroe computational power, so this tradeof was made.
   Duration? get incomingAudioStreamTimeout;
 
   /// If this client should use udp.
@@ -108,7 +104,6 @@ class AudioClientBase extends AudioClient {
   final List<_UdpErrorReceiver> _overUdp;
   final List<AudioFrameSink> _sinks;
   final Map<int, _AudioFrameStream> _streams;
-  late final Timer? _timeoutTimer;
 
   bool _udpAvailable;
 
@@ -148,16 +143,6 @@ class AudioClientBase extends AudioClient {
         this._overUdp = <_UdpErrorReceiver>[],
         this._streams = new Map<int, _AudioFrameStream>(),
         this._sinks = <AudioFrameSink>[] {
-    if (incomingAudioStreamTimeout != null) {
-      // By dividing by 2 (and saving the last checks result, see the check method),
-      // we can achive precision of 1 1/2. Likewise, by dividing by n we could
-      // achive precision of 1 1/n if we would also store the last n check results.
-      // 2 was choosen as suitable tradeof.
-      _timeoutTimer = new Timer.periodic(
-          incomingAudioStreamTimeout! ~/ 2, _checkIncommingStreamTimeouts);
-    } else {
-      _timeoutTimer = null;
-    }
     if (shouldUseUdp) {
       _udpTransport!
           .useUdp(onResyncRequest: _client.requestCryptStateResync)
@@ -167,21 +152,8 @@ class AudioClientBase extends AudioClient {
     }
   }
 
-  void _checkIncommingStreamTimeouts(Timer t) {
-    Map<int, _AudioFrameStream> eot = new Map<int, _AudioFrameStream>();
-    for (MapEntry<int, _AudioFrameStream> entry in _streams.entries) {
-      if (!entry.value.check()) {
-        eot[entry.key] = entry.value;
-      }
-    }
-    for (MapEntry<int, _AudioFrameStream> entry in eot.entries) {
-      _endOfTransmission(entry.value, entry.key);
-    }
-  }
-
   @override
   Future<void> close() async {
-    _timeoutTimer?.cancel();
     List<Future> closeFutures = <Future>[];
     for (Stream<AudioFrame> stream in _streams.values) {
       closeFutures.add((stream as _AudioFrameStream).close());
@@ -218,7 +190,8 @@ class AudioClientBase extends AudioClient {
   void feed(IncomingAudioPacket packet, bool fromUdp) {
     _AudioFrameStream? stream = _streams[packet.sessionId];
     if (stream == null) {
-      stream = new _AudioFrameStream(packet.sessionId);
+      stream =
+          new _AudioFrameStream(packet.sessionId, incomingAudioStreamTimeout);
       _streams[packet.sessionId] = stream;
       if (fromUdp) {
         _overUdp.add(stream);
@@ -418,43 +391,27 @@ mixin _UdpErrorReceiver {
   void onUdpError(Object error, StackTrace stackTrace);
 }
 
-class _AudioFrameStream extends Stream<AudioFrame> with _UdpErrorReceiver {
+class _AudioFrameStream extends StreamView<AudioFrame> with _UdpErrorReceiver {
   final StreamController<AudioFrame> _controller;
   final int userId;
-  int _currentAdd;
-  int _lastCheckAdd;
-  bool _lastCheckResult;
 
-  _AudioFrameStream(this.userId)
-      : this._controller = new StreamController<AudioFrame>.broadcast(),
-        this._currentAdd = 0,
-        this._lastCheckAdd = 0,
-        this._lastCheckResult = true;
+  _AudioFrameStream._(this.userId, Duration? timeout, this._controller)
+      : super(timeout == null
+            ? _controller.stream
+            : _controller.stream.timeout(timeout,
+                onTimeout: ((EventSink<AudioFrame> sink) => sink.close())));
+
+  factory _AudioFrameStream(int userId, Duration? timeout) {
+    StreamController<AudioFrame> controller =
+        new StreamController<AudioFrame>.broadcast();
+    return new _AudioFrameStream._(userId, timeout, controller);
+  }
 
   void add(AudioFrame packet) {
-    _currentAdd++;
     _controller.add(packet);
   }
 
-  // Returns true if during two consecutive checks at least one audio frame was received.
-  bool check() {
-    int _sinceLastCheck = _currentAdd - _lastCheckAdd;
-    _lastCheckAdd = _currentAdd;
-    bool thisCheckResult = _sinceLastCheck > 0;
-    bool overallResult = thisCheckResult || _lastCheckResult;
-    _lastCheckResult = thisCheckResult;
-    return overallResult;
-  }
-
   Future<void> close() => _controller.close();
-
-  /// `cancelOnError` is ignored.
-  @override
-  StreamSubscription<AudioFrame> listen(void Function(AudioFrame event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    return _controller.stream
-        .listen(onData, onError: onError, onDone: onDone, cancelOnError: true);
-  }
 
   @override
   void onUdpError(Object error, StackTrace stackTrace) {

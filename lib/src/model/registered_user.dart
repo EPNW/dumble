@@ -1,6 +1,7 @@
 import '../generated/Mumble.pb.dart' as Proto;
 import 'channel.dart';
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
+import '../exceptions.dart';
 import 'package:meta/meta.dart';
 
 @protected
@@ -15,7 +16,8 @@ RegisteredUser registeredUserFromProto(
             : null,
         lastChannel: channel);
   } else {
-    throw new ArgumentError('Required field userId not set in proto message!');
+    throw new ProtocolException(
+        'Required field userId not set in proto message!');
   }
 }
 

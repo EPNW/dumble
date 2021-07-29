@@ -12,7 +12,7 @@ import 'model/server_infos.dart';
 import 'model/text_message.dart';
 import 'model/ban.dart';
 import 'model/stats.dart';
-import 'utils.dart' show JsonString;
+import 'utils/utils.dart' show JsonString;
 
 /// The id of the root channel of a Mumble server is always `0`.
 const int rootChannelId = 0;
@@ -25,6 +25,7 @@ mixin CryptStateProvider {
 /// Register a [MumbleClientListener] to get notified on events.
 abstract class MumbleClient
     implements Notifier<MumbleClientListener>, CryptStateProvider {
+  /// The connection options used while this client was connected to a server.
   ConnectionOptions get options;
 
   /// The info the connected server send.
@@ -38,6 +39,14 @@ abstract class MumbleClient
 
   /// The audio client which can be used to transmitt audio.
   AudioClient get audio;
+
+  /// If this client is closed.
+  ///
+  /// If the client is closed, it will not do anything when calling a
+  /// method on it or, nor will it invoke any more callbacks. Methods that
+  /// have a return value and all properties will return the last known values,
+  /// but should not be used anymore.
+  bool get closed;
 
   /// Connects a mumble server.
   ///
@@ -65,7 +74,10 @@ abstract class MumbleClient
   }
 
   /// Closes the connection to a Mumble server.
+  ///
   /// After closing, you should discard this client and create a new client object if you want to ettablish another connection.
+  ///
+  /// Calling this method will set [closed] to `true` immediately. For implications, see the property documentation.
   Future<void> close();
 
   ///Lists all [User]s connected to the Mumble server, mapped to their id, but does not include [self].

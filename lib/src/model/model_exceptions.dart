@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 import 'permission.dart';
 
 import '../generated/Mumble.pb.dart' as Proto;
+import '../exceptions.dart';
 
 enum RejectType {
   /// The rejection reason is unknown (details should be available in Reject.reason).
@@ -35,21 +36,23 @@ enum RejectType {
 
 @protected
 RejectException rejectExceptionFromProto(Proto.Reject reject) {
-  return new RejectException._(
-      reason: reject.reason, rejectType: RejectType.values[reject.type.value]);
+  if (reject.hasType()) {
+    return new RejectException._(
+        reason: reject.reason,
+        rejectType: RejectType.values[reject.type.value]);
+  } else {
+    throw new ProtocolException('Expected value type not set!');
+  }
 }
 
 class RejectException implements Exception {
   final String? reason;
-  final RejectType? rejectType;
-  const RejectException._({this.reason, this.rejectType});
+  final RejectType rejectType;
+  const RejectException._({this.reason, required this.rejectType});
 
   @override
   String toString() {
-    String string = 'RejectException';
-    if (rejectType != null) {
-      string = string + ' ($rejectType)';
-    }
+    String string = 'RejectException ($rejectType)';
     if (reason != null) {
       string = string + ': $reason';
     }
@@ -103,17 +106,22 @@ enum DenyType {
 
 PermissionDeniedException permissionDeniedExceptionFromProto(
     Proto.PermissionDenied denied) {
-  throw new PermissionDeniedException._(
+  if (!denied.hasType()) {
+    throw new ProtocolException('Expected field type not set!');
+  }
+  return new PermissionDeniedException._(
       denyType: DenyType.values[denied.type.value],
-      deniedPermission: new Permission.fromInt(denied.permission),
-      invalidUserName: denied.name,
-      reason: denied.reason,
-      channel: denied.channelId,
-      user: denied.session);
+      deniedPermission: denied.hasPermission()
+          ? new Permission.fromInt(denied.permission)
+          : null,
+      invalidUserName: denied.hasName() ? denied.name : null,
+      reason: denied.hasReason() ? denied.reason : null,
+      channel: denied.hasChannelId() ? denied.channelId : null,
+      user: denied.hasSession() ? denied.session : null);
 }
 
 class PermissionDeniedException implements Exception {
-  final DenyType? denyType;
+  final DenyType denyType;
   final Permission? deniedPermission;
   final int? channel;
   final int? user;
@@ -121,9 +129,9 @@ class PermissionDeniedException implements Exception {
   final String? invalidUserName;
 
   const PermissionDeniedException._(
-      {this.denyType,
+      {required this.denyType,
       this.deniedPermission,
-      this.channel,
+      required this.channel,
       this.user,
       this.reason,
       this.invalidUserName});

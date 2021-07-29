@@ -5,7 +5,7 @@ import 'package:meta/meta.dart';
 import '../generated/Mumble.pb.dart' as Proto;
 import 'channel.dart';
 import 'voice_target.dart';
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 import 'user_stats.dart';
 import 'text_message.dart';
 

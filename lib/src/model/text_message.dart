@@ -1,6 +1,6 @@
 import 'channel.dart';
 import 'user.dart';
-import '../utils.dart' show JsonString;
+import '../utils/utils.dart' show JsonString;
 import 'package:meta/meta.dart';
 
 abstract class TextMessage with JsonString {

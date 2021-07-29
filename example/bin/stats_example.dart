@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:dumble/dumble.dart';
 import 'package:dumble_examples/connection_options.dart';
 
+// Note: This example wont produce any usable results, until the pinging was
+// overhaulted, see ROADMAP.md. It is just part of the examples for testing reasons.
 Future<void> main() async {
   MumbleClient client = await MumbleClient.connect(
       options: defaulConnectionOptionsWithCertificate,
@@ -68,5 +70,10 @@ class MumbleExampleCallback with MumbleClientListener, UserListener {
   @override
   void onUserStats(User user, UserStats stats) {
     print('Stats for ${user.name}: $stats');
+  }
+
+  @override
+  void onPermissionDenied(PermissionDeniedException e) {
+    print('Permission denied! $e');
   }
 }

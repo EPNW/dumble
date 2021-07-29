@@ -5,7 +5,8 @@ import 'dart:typed_data';
 import 'dart:async';
 import '../crypto.dart';
 import '../client.dart' show CryptStateProvider;
-import '../utils.dart' show FilterNullStream;
+import '../utils/utils.dart' show FilterNullStream;
+import '../exceptions.dart';
 
 class UdpPingException implements Exception {
   @override
@@ -147,7 +148,7 @@ class _UdpTransportBase extends UdpTransport {
             } else if (packet is IncomingAudioPacket) {
               _audio.add(packet);
             } else {
-              throw new ArgumentError(
+              throw new ProtocolException(
                   'It should be impossible to recieve anything else then a PingPacket or IncomingAudioPacket here!' +
                       'Recieved ${packet.runtimeType}: $packet');
             }

@@ -27,6 +27,9 @@ Future<void> main() async {
   client.self.setComment(comment: 'I\'m a bot!');
 // Create a channel. If the channel is succesfully created, our callback is invoked.
   client.createChannel(name: 'Dumble Test Channel');
+  //await new Future.delayed(const Duration(seconds: 30));
+  //await client.close();
+  //print('Bye!');
 }
 
 class MumbleExampleCallback with MumbleClientListener, UserListener {
@@ -50,14 +53,20 @@ class MumbleExampleCallback with MumbleClientListener, UserListener {
   void onCryptStateChanged() {}
 
   @override
-  void onDone() {}
+  void onDone() {
+    print('onDone');
+  }
 
   @override
   void onDropAllChannelPermissions() {}
 
   @override
   void onError(error, [StackTrace? stackTrace]) {
-    throw error;
+    print('An error occured!');
+    print(error);
+    if (stackTrace != null) {
+      print(stackTrace);
+    }
   }
 
   @override
@@ -94,15 +103,27 @@ class MumbleExampleCallback with MumbleClientListener, UserListener {
 
   @override
   void onUserRemoved(User user, User? actor, String? reason, bool? ban) {
-    if (user == actor) {
-      //The user left the server
+    // If the removed user is the actor that is responsible for this, the
+    // user simply left the server. Same is ture if the actor is null.
+    if (actor == null || user == actor) {
+      print('${user.name} left the server');
     } else if (ban ?? false) {
       // The user was baned from the server
+      print('${user.name} was banned by ${actor.name}, reason $reason.');
     } else {
       // The user was kicked from the server
+      print('${user.name} was kicked by ${actor.name}, reason $reason.');
     }
   }
 
   @override
   void onUserStats(User user, UserStats stats) {}
+
+  @override
+  void onPermissionDenied(PermissionDeniedException e) {
+    print('Permission denied!');
+    print(
+        'This will occur if this example is run a second time, since it will try to create a channel that already exists!');
+    print('The concrete exception was: $e');
+  }
 }

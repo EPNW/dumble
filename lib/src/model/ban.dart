@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:io' show InternetAddress;
 
 import 'package:meta/meta.dart';
-import '../utils.dart' show ByteAddress, JsonString;
+import '../utils/utils.dart' show ByteAddress, JsonString;
 import '../generated/Mumble.pb.dart' as Proto;
 
 // Comment: According to the proto file, everything is optional but address and mask

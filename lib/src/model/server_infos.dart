@@ -1,8 +1,9 @@
 import 'package:meta/meta.dart';
 
-import '../utils.dart' show JsonString, adjustNetworkBandwidth;
+import '../utils/utils.dart' show JsonString, adjustNetworkBandwidth;
 import 'stats.dart';
 import '../generated/Mumble.pb.dart' as Proto;
+import '../exceptions.dart';
 
 class ServerSuggestedClientConfig with JsonString {
   final int? suggestedClientVersion;
@@ -195,15 +196,15 @@ class ServerCodecVersion with JsonString {
 @protected
 ServerCodecVersion serverCodecVersionFromProto(Proto.CodecVersion codec) {
   if (!codec.hasAlpha()) {
-    throw new ArgumentError(
+    throw new ProtocolException(
         'The proto message does not contain the required field \'alpha\' and is thus invalid!');
   }
   if (!codec.hasBeta()) {
-    throw new ArgumentError(
+    throw new ProtocolException(
         'The proto message does not contain the required field \'beta\' and is thus invalid!');
   }
   if (!codec.hasPreferAlpha()) {
-    throw new ArgumentError(
+    throw new ProtocolException(
         'The proto message does not contain the required field \'preferAlpha\' and is thus invalid!');
   }
   return new ServerCodecVersion._(

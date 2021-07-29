@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:fixnum/fixnum.dart' as Fixnum show Int64;
 import 'package:protobuf/protobuf.dart';
 
-import 'model/exceptions.dart';
+import 'model/model_exceptions.dart';
 import 'connection.dart';
 import 'generated/Mumble.pb.dart' as Proto;
 import 'connection_options.dart' as ConnectionOptions;
-import 'utils.dart' as Utils;
+import 'utils/utils.dart' as Utils;
 import 'messages.dart' as Messages;
-import 'dart:async';
+import 'exceptions.dart';
+import 'utils/extended_completer.dart';
 import 'client.dart';
 import 'model/channel.dart';
 import 'model/voice_target.dart';
@@ -38,6 +41,10 @@ class MumbleClientBase extends MumbleClient
   final Map<int, Channel> _channels;
   final Connection _connection;
   final Completer<void> _pinging;
+  bool _closed;
+
+  @override
+  bool get closed => _closed;
 
   @override
   final ConnectionOptions.ConnectionOptions options;
@@ -73,38 +80,39 @@ class MumbleClientBase extends MumbleClient
         this._users = new Map<int, User>(),
         this._channels = new Map<int, Channel>(),
         this._serverInfo = new ServerInfoBase(),
-        this._pinging = new Completer<void>();
-
-  /// Starts the ping routine but does not await it
-  void _startPingRoutine() {
-    _pingRoutine();
-  }
+        this._pinging = new Completer<void>(),
+        this._closed = false;
 
   Future<void> _pingRoutine() async {
-    const Duration timeout = const Duration(seconds: 30);
     final DateTime start = new DateTime.now();
+    final Duration waitDuration = options.pingTimeout * 0.25;
     while (!_pinging.isCompleted) {
-      _connection.writeMessage(new Proto.Ping()
+      writeMessage(new Proto.Ping()
         ..timestamp =
             new Fixnum.Int64(new DateTime.now().millisecondsSinceEpoch));
-      await Future.any(<Future>[
-        new Future.delayed(const Duration(seconds: 15)),
-        _pinging.future
-      ]);
-      DateTime now = new DateTime.now();
-      if (now.difference(_lastMessageReceived ?? start) >= timeout) {
-        print("TIMEOUT"); //TODO
+      await Future.any(
+          <Future>[new Future.delayed(waitDuration), _pinging.future]);
+      if (!_pinging.isCompleted) {
+        Duration difference =
+            new DateTime.now().difference(_lastMessageReceived ?? start);
+        if (difference >= options.pingTimeout) {
+          throw new TimeoutException(
+              'Received last message $difference ago', options.pingTimeout);
+        }
       }
     }
   }
 
   @override
   Future<void> close() async {
-    await _lateAudio?.close();
-    if (!_pinging.isCompleted) {
-      _pinging.complete();
+    if (!_closed) {
+      _closed = true;
+      await _lateAudio?.close();
+      if (!_pinging.isCompleted) {
+        _pinging.complete();
+      }
+      _connection.destroy();
     }
-    await _connection.close();
   }
 
   static Future<MumbleClient> connect(
@@ -113,7 +121,7 @@ class MumbleClientBase extends MumbleClient
       bool useUdp: true,
       Object? localUdpBindAddress,
       int localUdpBindPort: 0}) async {
-    Completer<void> syncCompleter = new Completer<void>();
+    ExtendedCompleter<void> syncCompleter = new ExtendedCompleter<void>();
     Connection con = await Connection.connect(
         host: options.host,
         port: options.port,
@@ -121,14 +129,38 @@ class MumbleClientBase extends MumbleClient
         onBadCertificate: onBadCertificate);
     MumbleClientBase client =
         new MumbleClientBase(options: options, connection: con);
-    con.listen((ProtobufPacket message) {
-      if (message.type == Messages.serverSync) {
-        client._handleServerSync(Messages.decode(message) as Proto.ServerSync);
-        syncCompleter.complete();
-      } else {
-        client._onMessage(message);
+    void Function(dynamic e, StackTrace stackTrace) handleError =
+        (dynamic e, StackTrace stackTrace) {
+      if (syncCompleter.isCompletedWithoutError) {
+        client._onError(e, stackTrace);
+      } else if (!syncCompleter.isCompleted) {
+        syncCompleter.completeError(e, stackTrace);
       }
-    }, onError: client._onError, onDone: client._onDone);
+    };
+    con.listen(
+        (ProtobufPacket message) {
+          if (message.type == Messages.serverSync) {
+            client._handleServerSync(
+                Messages.decode(message) as Proto.ServerSync);
+            syncCompleter.complete();
+          } else {
+            try {
+              client._onMessage(message);
+            } catch (e, stackTrace) {
+              handleError(e, stackTrace);
+            }
+          }
+        },
+        cancelOnError: true,
+        onError: handleError,
+        onDone: () {
+          if (syncCompleter.isCompletedWithoutError) {
+            client._onDone();
+          } else if (!syncCompleter.isCompleted) {
+            syncCompleter.completeError(new ProtocolException(
+                'The mumble server closed the connection before syncing but without an error!'));
+          }
+        });
     client.writeMessage(new Proto.Version()
       ..version = ConnectionOptions.clientVersion
       ..release = ConnectionOptions.clientName
@@ -143,22 +175,22 @@ class MumbleClientBase extends MumbleClient
       auth.password = options.password!;
     }
     client.writeMessage(auth);
-    client._startPingRoutine();
+    client._pingRoutine().catchError(handleError);
     await syncCompleter.future;
     // By now, the _lateSelf, _lateRootChannel and _lateCryptState should have been initalized,
     // so assert it
     if (client._lateCryptState == null) {
-      throw new StateError(
+      throw new ProtocolException(
           'Received sync complete message from server, but CryptState is still missing!' +
               '\r\nThis should be impossible!');
     }
     if (client._lateSelf == null) {
-      throw new StateError(
+      throw new ProtocolException(
           'Received sync complete message from server, but Self is still missing!' +
               '\r\nThis should be impossible!');
     }
     if (client._lateRootChannel == null) {
-      throw new StateError(
+      throw new ProtocolException(
           'Received sync complete message from server, but the root channel is still missing!' +
               '\r\nThis should be impossible!');
     }
@@ -171,13 +203,25 @@ class MumbleClientBase extends MumbleClient
     return client;
   }
 
+  // Called only after a succesfull sync
   void _onError(Object error, [StackTrace? stackTrace]) {
-    listeners.forEach(
-        (MumbleClientListener listener) => listener.onError(error, stackTrace));
+    if (!_closed) {
+      close();
+      if (hasListeners) {
+        listeners.forEach((MumbleClientListener listener) =>
+            listener.onError(error, stackTrace));
+      } else {
+        throw new UnhandeledError(error, stackTrace);
+      }
+    }
   }
 
+  // Called only after a succesfull sync
   void _onDone() {
-    listeners.forEach((MumbleClientListener listener) => listener.onDone());
+    if (!_closed) {
+      close();
+      listeners.forEach((MumbleClientListener listener) => listener.onDone());
+    }
   }
 
   void _onMessage(ProtobufPacket message) {
@@ -244,7 +288,12 @@ class MumbleClientBase extends MumbleClient
       case Messages.permissionDenied:
         Proto.PermissionDenied denied =
             Messages.decode(message) as Proto.PermissionDenied;
-        throw permissionDeniedExceptionFromProto(denied);
+        PermissionDeniedException permissionDeniedException =
+            permissionDeniedExceptionFromProto(denied);
+        // Dont't throw the exception, just report it
+        listeners.forEach((MumbleClientListener listener) =>
+            listener.onPermissionDenied(permissionDeniedException));
+        break;
       case Messages.permissionQuery:
         Proto.PermissionQuery query =
             Messages.decode(message) as Proto.PermissionQuery;
@@ -302,7 +351,7 @@ class MumbleClientBase extends MumbleClient
       // TODO test if we are always synced by now and can use audio instead of _lateAudio
       _lateAudio?.feed(audio, false);
     } else {
-      throw new ArgumentError(
+      throw new ProtocolException(
           'Did not expect a packet here that is NOT of type IncomingAudioPacket!' +
               'Actual type was ${audio.runtimeType}');
     }
@@ -310,11 +359,11 @@ class MumbleClientBase extends MumbleClient
 
   void _handleServerSync(Proto.ServerSync message) {
     if (!message.hasSession()) {
-      throw ArgumentError('Bad message, session id missing!');
+      throw ProtocolException('Bad message, session id missing!');
     }
     User? user = _users[message.session];
     if (user == null) {
-      throw new StateError(
+      throw new ProtocolException(
           'A synced message was recevied, but not the own user object!');
     }
     _lateSelf = asSelf(user: user);
@@ -328,7 +377,9 @@ class MumbleClientBase extends MumbleClient
 //TODO Plugin Stuff
 
   void writeMessage<T extends GeneratedMessage>(T message) {
-    _connection.writeMessage<T>(message);
+    if (!_closed) {
+      _connection.writeMessage<T>(message);
+    }
   }
 
   void _handleTextMessage(Proto.TextMessage message) {
@@ -352,7 +403,9 @@ class MumbleClientBase extends MumbleClient
   }
 
   void tunnelAudioPacket(AudioPacket packet) {
-    _connection.tunnelAudioPacket(packet);
+    if (!_closed) {
+      _connection.tunnelAudioPacket(packet);
+    }
   }
 
   @override
@@ -414,7 +467,7 @@ class MumbleClientBase extends MumbleClient
 
   void _handleChannelState(Proto.ChannelState message) {
     if (!message.hasChannelId()) {
-      throw new ArgumentError('Bad message, channel id missing!');
+      throw new ProtocolException('Bad message, channel id missing!');
     }
     final bool created;
     final Channel channel;
@@ -486,7 +539,7 @@ class MumbleClientBase extends MumbleClient
         throw new ArgumentError('Can not remove the root channel!');
       }
     } else {
-      throw new ArgumentError('Bad message, channel id missing!');
+      throw new ProtocolException('Bad message, channel id missing!');
     }
   }
 
@@ -538,7 +591,7 @@ class MumbleClientBase extends MumbleClient
 
   void _handleUserState(Proto.UserState message) {
     if (!message.hasSession()) {
-      throw new ArgumentError('Bad message, session id missing!');
+      throw new ProtocolException('Bad message, session id missing!');
     }
     Channel? channel = _getChannel(message.hasChannelId(), message.channelId);
     final bool created;
@@ -547,7 +600,7 @@ class MumbleClientBase extends MumbleClient
     if (userOrNull == null) {
       channel ??= _lateRootChannel;
       if (channel == null) {
-        throw new StateError(
+        throw new ProtocolException(
             'Channel is null for a new user and there is no root channel! This should never happen!');
       }
       user = createNewUser(
@@ -574,13 +627,22 @@ class MumbleClientBase extends MumbleClient
   }
 
   void _handleUserRemove(Proto.UserRemove message) {
-    User? user = _users.remove(message.session);
-    if (user != null) {
+    if (self.session == message.session) {
+      // We were kicked or banned by someone!
       notifyUserRemoved(
-          user: user,
+          user: self,
           actor: _getUserOrSelf(message.hasActor(), message.actor),
           reason: message.reason,
           ban: message.ban);
+    } else {
+      User? user = _users.remove(message.session);
+      if (user != null) {
+        notifyUserRemoved(
+            user: user,
+            actor: _getUserOrSelf(message.hasActor(), message.actor),
+            reason: message.reason,
+            ban: message.ban);
+      }
     }
   }
 
