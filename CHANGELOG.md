@@ -1,3 +1,6 @@
+# [0.8.8] - 30.07.2021
+  * Fixed a bug in conjunction with the usage of `Stream.timeout` introduced in `0.8.6`
+  
 # [0.8.7] - 29.07.2021
   * Created `AudioFrame.outgoing` as dedicated constructor for outgoing audio frames
 

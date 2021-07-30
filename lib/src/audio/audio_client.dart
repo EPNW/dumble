@@ -203,8 +203,8 @@ class AudioClientBase extends AudioClient {
   void feed(IncomingAudioPacket packet, bool fromUdp) {
     _AudioFrameStream? stream = _streams[packet.sessionId];
     if (stream == null) {
-      stream =
-          new _AudioFrameStream(packet.sessionId, incomingAudioStreamTimeout);
+      stream = new _AudioFrameStream(packet.sessionId,
+          incomingAudioStreamTimeout, () => _endOfTransmission(stream!));
       _streams[packet.sessionId] = stream;
       if (fromUdp) {
         _overUdp.add(stream);
@@ -224,13 +224,13 @@ class AudioClientBase extends AudioClient {
       sequenceNumber++;
     }
     if (packet.endOfTransmission) {
-      _endOfTransmission(stream, packet.sessionId);
+      _endOfTransmission(stream);
     }
   }
 
-  void _endOfTransmission(_AudioFrameStream stream, int sessionId) {
+  void _endOfTransmission(_AudioFrameStream stream) {
     stream.close();
-    _streams.remove(sessionId);
+    _streams.remove(stream.userId);
   }
 
   @override
@@ -407,17 +407,22 @@ mixin _UdpErrorReceiver {
 class _AudioFrameStream extends StreamView<AudioFrame> with _UdpErrorReceiver {
   final StreamController<AudioFrame> _controller;
   final int userId;
+  final void Function() onTimeout;
 
-  _AudioFrameStream._(this.userId, Duration? timeout, this._controller)
+  _AudioFrameStream._(
+      this.userId, Duration? timeout, this._controller, this.onTimeout)
       : super(timeout == null
             ? _controller.stream
             : _controller.stream.timeout(timeout,
-                onTimeout: ((EventSink<AudioFrame> sink) => sink.close())));
+                onTimeout: ((EventSink<AudioFrame> sink) {
+                onTimeout();
+              })));
 
-  factory _AudioFrameStream(int userId, Duration? timeout) {
+  factory _AudioFrameStream(
+      int userId, Duration? timeout, void Function() onTimeout) {
     StreamController<AudioFrame> controller =
         new StreamController<AudioFrame>.broadcast();
-    return new _AudioFrameStream._(userId, timeout, controller);
+    return new _AudioFrameStream._(userId, timeout, controller, onTimeout);
   }
 
   void add(AudioFrame packet) {
