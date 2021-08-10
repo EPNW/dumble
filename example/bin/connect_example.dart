@@ -27,9 +27,9 @@ Future<void> main() async {
   client.self.setComment(comment: 'I\'m a bot!');
 // Create a channel. If the channel is succesfully created, our callback is invoked.
   client.createChannel(name: 'Dumble Test Channel');
-  //await new Future.delayed(const Duration(seconds: 30));
-  //await client.close();
-  //print('Bye!');
+  await new Future.delayed(const Duration(seconds: 30));
+  await client.close();
+  print('Bye!');
 }
 
 class MumbleExampleCallback with MumbleClientListener, UserListener {
@@ -103,10 +103,16 @@ class MumbleExampleCallback with MumbleClientListener, UserListener {
 
   @override
   void onUserRemoved(User user, User? actor, String? reason, bool? ban) {
-    // If the removed user is the actor that is responsible for this, the
-    // user simply left the server. Same is ture if the actor is null.
-    if (actor == null || user == actor) {
-      print('${user.name} left the server');
+    // If actor that is responsible for this is null, the
+    // user simply left the server...
+    if (actor == null) {
+      // ... except if the user is us!
+      if (user == client.self) {
+        // Then, we got removed for a reason
+        print('We were removed from the server, reason: $reason');
+      } else {
+        print('${user.name} left the server');
+      }
     } else if (ban ?? false) {
       // The user was baned from the server
       print('${user.name} was banned by ${actor.name}, reason $reason.');

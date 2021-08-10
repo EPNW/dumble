@@ -203,6 +203,11 @@ class AudioClientBase extends AudioClient {
   void feed(IncomingAudioPacket packet, bool fromUdp) {
     _AudioFrameStream? stream = _streams[packet.sessionId];
     if (stream == null) {
+      if (!hasListeners) {
+        // If we have no listeners, we don't need a new stream
+        // since if it would be created, no one would notice
+        return;
+      }
       stream = new _AudioFrameStream(packet.sessionId,
           incomingAudioStreamTimeout, () => _endOfTransmission(stream!));
       _streams[packet.sessionId] = stream;

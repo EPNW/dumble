@@ -1,5 +1,5 @@
 name: dumble
-version: 0.8.8
+version: 0.8.9
 description: A Mumble transport client framework supporting multiple Mumble features such as fully encrypted udp transport or user management
 repository: https://github.com/EPNW/dumble
 environment:

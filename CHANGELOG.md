@@ -1,3 +1,6 @@
+# [0.8.9] - 10.08.2021
+  * Fixed a bug where if joining a server and someone was already talking, the audio was missed
+
 # [0.8.8] - 30.07.2021
   * Fixed a bug in conjunction with the usage of `Stream.timeout` introduced in `0.8.6`
   

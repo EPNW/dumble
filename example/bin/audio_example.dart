@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -32,16 +33,9 @@ Future<void> main() async {
       application: Application.voip);
   AudioFrameSink audioOutput = client.audio.sendAudio(codec: AudioCodec.opus);
   await simulateAudioRecording() // This simulates recording by reading from a file
-      .asyncMap((List<int> bytes) async {
-        // We need to wait a bit since reading from a file is "faster than realtime".
-        // Usually we would wait frameTimeMs, but since encoding with opus takes about abit
-        // (we assume 17ms here), we wait less.
-        // In an actual live recording, you dont need this artificial waiting.
-        await new Future.delayed(
-            const Duration(milliseconds: frameTimeMs - 17));
-        return bytes;
-      })
       .transform(encoder)
+      // We need to wait since reading from a file is "faster than realtime".
+      .transform(new WaitingTransformer(frameTimeMs))
       .map((Uint8List audioBytes) => new AudioFrame.outgoing(frame: audioBytes))
       .pipe(audioOutput);
 }
@@ -156,4 +150,37 @@ Uint8List wavHeader(
   bytes.setAll(12, ascii.encode('fmt '));
   bytes.setAll(36, ascii.encode('data'));
   return bytes;
+}
+
+class WaitingTransformer<T> extends StreamTransformerBase<T, T> {
+  final int waitTimeMs;
+  WaitingTransformer(this.waitTimeMs);
+
+  // Don't use Future.delayed here since it is inprecise
+  @override
+  Stream<T> bind(Stream<T> stream) {
+    Timer? t;
+    StreamController<T> controller =
+        new StreamController<T>(onCancel: t?.cancel, sync: true);
+    stream.toList().then((List<T> data) {
+      if (!controller.isClosed && data.isNotEmpty) {
+        controller.add(data[0]);
+        if (data.length > 1) {
+          int index = 1;
+          t = new Timer.periodic(new Duration(milliseconds: waitTimeMs),
+              (Timer t) {
+            if (t.isActive) {
+              controller.add(data[index]);
+              index++;
+              if (index == data.length) {
+                t.cancel();
+                controller.close();
+              }
+            }
+          });
+        }
+      }
+    });
+    return controller.stream;
+  }
 }
