@@ -1,13 +1,13 @@
 import 'dart:typed_data';
-import 'dart:io' show InternetAddress;
 
 import 'package:meta/meta.dart';
-import '../utils/utils.dart' show ByteAddress, JsonString;
+import '../utils/utils.dart' show IP, JsonString;
 import '../generated/Mumble.pb.dart' as Proto;
 
 // Comment: According to the proto file, everything is optional but address and mask
 class BanEntry with JsonString {
-  final InternetAddress address;
+  final String address;
+  final Uint8List _rawAddress;
   final int mask;
   final String? name;
   final String? hash;
@@ -28,12 +28,14 @@ class BanEntry with JsonString {
       this.reason,
       DateTime? start,
       this.duration})
-      : this.start = start?.toUtc();
+      : this.start = start?.toUtc(),
+        this._rawAddress = IP.asIPv6Bytes(address);
 
   @override
   Map<String, Object> jsonMap() {
     Map<String, Object> map = new Map<String, Object>()
       ..['address'] = address.toString()
+      ..['_rawAddress'] = _rawAddress.toString()
       ..['mask'] = mask;
 
     if (name != null) {
@@ -59,8 +61,9 @@ class BanEntry with JsonString {
 @protected
 Proto.BanList_BanEntry serializeBanEntry(BanEntry banEntry) {
   Proto.BanList_BanEntry proto = new Proto.BanList_BanEntry();
-  proto.address = banEntry.address.asIPv6().rawAddress;
-  proto.mask = banEntry.mask + (banEntry.address.isIPv6() ? 0 : 96);
+  proto.address = banEntry._rawAddress;
+  proto.mask =
+      banEntry.mask + (IP.possibleAsIPv4(banEntry._rawAddress) ? 96 : 0);
   if (banEntry.hash != null) {
     proto.hash = banEntry.hash!;
   }
@@ -82,12 +85,11 @@ Proto.BanList_BanEntry serializeBanEntry(BanEntry banEntry) {
 
 @protected
 BanEntry banEntryFromProto(Proto.BanList_BanEntry entry) {
-  InternetAddress address = ByteAddress.fromBytes(
-      new Uint8List.fromList(entry.address),
-      asIPv4IfPossible: true);
+  Uint8List rawAddress = new Uint8List.fromList(entry.address);
+  String address = IP.fromBytes(rawAddress, asIPv4IfPossible: true);
   return new BanEntry._(
       address: address,
-      mask: entry.mask - (address.isIPv6() ? 0 : 96),
+      mask: entry.mask - (IP.possibleAsIPv4(rawAddress) ? 96 : 0),
       duration: entry.hasDuration() && entry.duration > 0
           ? new Duration(seconds: entry.duration)
           : null,

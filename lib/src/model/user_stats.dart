@@ -1,19 +1,18 @@
 import 'dart:convert' show base64;
-import 'dart:io' show InternetAddress;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-import '../utils/utils.dart' show JsonString, ByteAddress;
+import '../utils/utils.dart' show IP, JsonString;
 import '../generated/Mumble.pb.dart' as Proto;
 import 'stats.dart';
 
 @protected
 UserStats userStatsFromProto({required Proto.UserStats stats}) {
-  InternetAddress? address;
+  String? address;
   if (stats.hasAddress() &&
       (stats.address.length == 4 || stats.address.length == 16)) {
-    address = ByteAddress.fromBytes(new Uint8List.fromList(stats.address),
+    address = IP.fromBytes(new Uint8List.fromList(stats.address),
         asIPv4IfPossible: true);
   }
 
@@ -72,7 +71,7 @@ class UserStats with JsonString {
   final PingStats pingStats;
   final VersionInformation? clientVersion;
   final List<int>? celtVersions;
-  final InternetAddress? address;
+  final String? address;
   final int? bandwidth;
   final Duration? onlineTime;
   final Duration? idleTime;
