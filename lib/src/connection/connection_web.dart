@@ -27,7 +27,7 @@ class ConnectionImp extends Connection {
     StreamController<List<int>> receive =
         new StreamController<List<int>>(sync: true);
     Completer<void> open = new Completer<void>();
-    late final StreamSubscription sub;
+    late StreamSubscription sub;
     sub = socket.allEvents.listen(
         (Object event) {
           if (event is _OpenEvent) {
