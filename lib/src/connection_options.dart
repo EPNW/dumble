@@ -1,13 +1,6 @@
-import 'dart:io' show Platform, SecurityContext;
+import 'dart:io' show SecurityContext;
 
-import 'utils/utils.dart' show JsonString, encodeVersion;
-
-int get clientVersion => encodeVersion(1, 4, 0);
-
-String get clientName => 'Dumble';
-String get os => 'Dart VM';
-
-String get osVersion => Platform.version;
+import 'utils/utils.dart' show JsonString;
 
 class ConnectionOptions with JsonString {
   /// The Mumble server.

@@ -6,7 +6,8 @@ import 'package:protobuf/protobuf.dart';
 import 'model/model_exceptions.dart';
 import 'connection.dart';
 import 'generated/Mumble.pb.dart' as Proto;
-import 'connection_options.dart' as ConnectionOptions;
+import 'connection_options.dart';
+import 'version.dart' as Version;
 import 'utils/utils.dart' as Utils;
 import 'messages.dart' as Messages;
 import 'exceptions.dart';
@@ -47,7 +48,7 @@ class MumbleClientBase extends MumbleClient
   bool get closed => _closed;
 
   @override
-  final ConnectionOptions.ConnectionOptions options;
+  final ConnectionOptions options;
 
   DateTime? _lastMessageReceived;
 
@@ -116,7 +117,7 @@ class MumbleClientBase extends MumbleClient
   }
 
   static Future<MumbleClient> connect(
-      {required ConnectionOptions.ConnectionOptions options,
+      {required ConnectionOptions options,
       OnBadCertificate? onBadCertificate,
       bool useUdp: true,
       Object? localUdpBindAddress,
@@ -162,10 +163,10 @@ class MumbleClientBase extends MumbleClient
           }
         });
     client.writeMessage(new Proto.Version()
-      ..version = ConnectionOptions.clientVersion
-      ..release = ConnectionOptions.clientName
-      ..os = ConnectionOptions.os
-      ..osVersion = ConnectionOptions.osVersion);
+      ..version = Version.clientVersion
+      ..release = Version.clientName
+      ..os = Version.os
+      ..osVersion = Version.osVersion);
     Proto.Authenticate auth = new Proto.Authenticate()
       ..username = options.name
       ..opus = options.opus
