@@ -1,15 +1,14 @@
-import 'dart:io';
-
 import 'package:dumble/dumble.dart';
 import 'package:dumble_examples/connection_options.dart';
+// Explicitly import the VM version, see below!
+import 'package:dumble_examples/platform_options_vm.dart';
 
+/// This example only works on the vm (NOT on the web), since we can't set
+/// client certificates on the web!
 Future<void> main() async {
   MumbleClient client = await MumbleClient.connect(
-      options: defaulConnectionOptionsWithCertificate,
-      onBadCertificate: (X509Certificate certificate) {
-        //Accept every certificate
-        return true;
-      });
+      options: defaultConnectionOptions,
+      platformOptions: defaultPlatformOptionsWithClientCertificate);
   client.self.add(new SelfCallback(client.self.session));
   client.self.registerUser();
 }

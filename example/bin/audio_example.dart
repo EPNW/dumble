@@ -17,11 +17,8 @@ Future<void> main() async {
   initOpus(new DynamicLibrary.open('libopus_x64.dll') as dynamic);
   //Connect to a mumble server
   MumbleClient client = await MumbleClient.connect(
-      options: defaulConnectionOptions,
-      onBadCertificate: (X509Certificate certificate) {
-        //Accept every certificate
-        return true;
-      });
+      options: defaultConnectionOptions,
+      platformOptions: defaultPlatformOptions);
   client.audio.add(new SaveToFileAudioListener());
   await new Future.delayed(
       const Duration(seconds: 5)); // Wait a few seconds before we start talking

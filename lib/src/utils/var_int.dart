@@ -53,14 +53,23 @@ extension VarIntExtension on ByteData {
       this.setUint8(index, _target32);
       this.setUint32(index + 1, value);
       lengthInBytes = 5;
-    } else if (value <= 0x7FFFFFFFFFFFFFFF) {
+    } else {
       this.setUint8(index, _target64);
       this.setUint64(index + 1, value);
       lengthInBytes = 9;
-    } else {
-      throw new ArgumentError.value(
-          value, 'value', 'must not exceed 0x7FFFFFFFFFFFFFFF!');
     }
+// Note on the above else section: Per varint definition, there commeted code below
+// would be correct, but dart2js cant represent  0x7FFFFFFFFFFFFFFF. Since in practice
+// there should be numbers that take more then 64bit to represent, this should not be
+// a problem.
+//    } else if (value <= 0x7FFFFFFFFFFFFFFF) {
+//      this.setUint8(index, _target64);
+//      this.setUint64(index + 1, value);
+//      lengthInBytes = 9;
+//    } else {
+//      throw new ArgumentError.value(
+//          value, 'value', 'must not exceed 0x7FFFFFFFFFFFFFFF!');
+//    }
     return lengthInBytes;
   }
 

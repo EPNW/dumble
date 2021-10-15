@@ -1,15 +1,10 @@
-import 'dart:io';
-
 import 'package:dumble/dumble.dart';
 import 'package:dumble_examples/connection_options.dart';
 
 Future<void> main() async {
   MumbleClient client = await MumbleClient.connect(
-      options: defaulConnectionOptionsWithCertificate,
-      onBadCertificate: (X509Certificate certificate) {
-        //Accept every certificate
-        return true;
-      });
+      options: defaultConnectionOptions,
+      platformOptions: defaultPlatformOptions);
   MumbleExampleCallback callback = new MumbleExampleCallback(client);
   client.add(callback);
   print('Client synced with server!');
