@@ -31,10 +31,10 @@ export 'src/model/text_message.dart'
 export 'src/model/user_stats.dart' show UserStats;
 export 'src/model/user.dart' show Self, User, UserChanges;
 export 'src/model/voice_target.dart' show VoiceTarget;
+export 'src/platform/platform_options.dart' show PlatformOptions;
 export 'src/client.dart'
     show MumbleClient, ServerInfo, rootChannelId, CryptStateProvider;
 export 'src/connection_options.dart' show ConnectionOptions;
-export 'src/connection.dart' show OnBadCertificate;
 export 'src/listeners.dart'
     show
         AudioListener,

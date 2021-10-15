@@ -1,10 +1,11 @@
 import 'dart:async';
 
+import 'package:dumble/src/platform/platform_options.dart';
 import 'package:fixnum/fixnum.dart' as Fixnum show Int64;
 import 'package:protobuf/protobuf.dart';
 
 import 'model/model_exceptions.dart';
-import 'connection.dart';
+import 'connection/connection.dart';
 import 'generated/Mumble.pb.dart' as Proto;
 import 'connection_options.dart';
 import 'version.dart' as Version;
@@ -118,16 +119,9 @@ class MumbleClientBase extends MumbleClient
 
   static Future<MumbleClient> connect(
       {required ConnectionOptions options,
-      OnBadCertificate? onBadCertificate,
-      bool useUdp: true,
-      Object? localUdpBindAddress,
-      int localUdpBindPort: 0}) async {
+      required PlatformOptions platformOptions}) async {
     ExtendedCompleter<void> syncCompleter = new ExtendedCompleter<void>();
-    Connection con = await Connection.connect(
-        host: options.host,
-        port: options.port,
-        context: options.context,
-        onBadCertificate: onBadCertificate);
+    Connection con = await Connection.connect(options: platformOptions);
     MumbleClientBase client =
         new MumbleClientBase(options: options, connection: con);
     void Function(dynamic e, StackTrace stackTrace) handleError =
@@ -196,11 +190,7 @@ class MumbleClientBase extends MumbleClient
               '\r\nThis should be impossible!');
     }
     client._lateAudio = await AudioClientBase.withRemoteHostLookup(
-        client,
-        useUdp,
-        localUdpBindAddress,
-        localUdpBindPort,
-        options.incomingAudioStreamTimeout);
+        client, platformOptions, options.incomingAudioStreamTimeout);
     return client;
   }
 

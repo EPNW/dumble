@@ -1,22 +1,11 @@
-import 'dart:io' show SecurityContext;
-
 import 'utils/utils.dart' show JsonString;
 
 class ConnectionOptions with JsonString {
-  /// The Mumble server.
-  final String host;
-
-  /// The port of the Mumble server.
-  final int port;
-
   /// The users name.
   final String name;
 
   /// A password, if this user is the superuser.
   final String? password;
-
-  /// The connections security context containing this users certificate (see the constructor).
-  final SecurityContext? context;
 
   /// The channel access tokens know on connect.
   final List<String> tokens;
@@ -41,10 +30,7 @@ class ConnectionOptions with JsonString {
   ///
   /// See the matching field documentation for more information about the parameters.
   ConnectionOptions(
-      {required this.host,
-      required this.port,
-      required this.name,
-      this.context,
+      {required this.name,
       this.password,
       this.opus: true,
       this.tokens = const <String>[],
@@ -55,8 +41,6 @@ class ConnectionOptions with JsonString {
   @override
   Map<String, Object> jsonMap() {
     Map<String, Object> map = new Map<String, Object>()
-      ..['host'] = host
-      ..['port'] = port
       ..['name'] = name
       ..['tokens'] = tokens
       ..['celtVersions'] = celtVersions

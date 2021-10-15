@@ -1,62 +1,46 @@
 import 'dart:io';
-import '../model/crypto.dart';
-import 'audio_packet.dart';
+import '../../model/crypto.dart';
 import 'dart:typed_data';
+import '../../crypto.dart';
+import '../../exceptions.dart';
+import 'udp_transport.dart';
+import '../../client.dart' show CryptStateProvider;
+import '../../platform/platform_options_vm.dart';
+import '../../platform/platform_options.dart';
+import '../audio_packet.dart';
+import '../../utils/utils.dart' show FilterNullStream;
 import 'dart:async';
-import '../crypto.dart';
-import '../client.dart' show CryptStateProvider;
-import '../utils/utils.dart' show FilterNullStream;
-import '../exceptions.dart';
 
-class UdpPingException implements Exception {
-  @override
-  String toString() =>
-      'UdpPingException: Pinging not successfull. This means that the udp transport is too unreliable at the moment. This may change when pinging is succesfull again.';
-}
-
-typedef void ResyncRequestHandler();
-
-abstract class UdpTransport {
-  InternetAddress get remoteHost;
-  Object? get localBindAddress;
-  int get localPort;
-  int get remotePort;
-  Duration get pingIntervall;
-  Duration get timeout;
-  bool get pingingSuccessfull;
-  Stream<IncomingAudioPacket> get audio;
-  Duration? get latency;
-
-  void writePacket(AudioPacket packet);
-  Stream<bool> useUdp({ResyncRequestHandler? onResyncRequest});
-  void close();
-
-  static Future<UdpTransport> withRemoteHostLookup(
-      {required String remoteHost,
-      required int localPort,
-      required int remotePort,
-      Object? localBindAddress,
+class UdpTransportImp extends UdpTransport {
+  static Future<UdpTransport?> withRemoteHostLookup(
+      {required PlatformOptions platformOptions,
       required CryptStateProvider cryptStateProvider,
       Duration? pingIntervall,
       Duration? timeout}) async {
-    return new _UdpTransportBase(
-        remoteHost: (await InternetAddress.lookup(remoteHost,
-                type: (localBindAddress == null
-                    ? InternetAddressType.IPv4
-                    : InternetAddressType.any)))
-            .first,
-        localPort: localPort,
-        remotePort: remotePort,
-        localBindAddress: localBindAddress,
-        cryptStateProvider: cryptStateProvider,
-        pingIntervall: pingIntervall,
-        timeout: timeout);
+    PlatformOptionsVM options = platformOptions as PlatformOptionsVM;
+    if (options.udpEnabled) {
+      return new UdpTransportImp(
+          remoteHost: options.host,
+          remoteHostAddress: (await InternetAddress.lookup(options.host,
+                  type: (options.udpLocalBindAddress == null
+                      ? InternetAddressType.IPv4
+                      : InternetAddressType.any)))
+              .first,
+          localPort: options.udpLocalBindPort,
+          remotePort: options.port,
+          localBindAddress: options.udpLocalBindAddress,
+          cryptStateProvider: cryptStateProvider,
+          pingIntervall: pingIntervall,
+          timeout: timeout);
+    } else {
+      return null;
+    }
   }
-}
 
-class _UdpTransportBase extends UdpTransport {
+  final InternetAddress remoteHostAddress;
+
   @override
-  final InternetAddress remoteHost;
+  final String remoteHost;
   @override
   final Object? localBindAddress;
   @override
@@ -87,8 +71,9 @@ class _UdpTransportBase extends UdpTransport {
   Duration? get latency => _latency;
   Duration? _latency;
 
-  _UdpTransportBase(
+  UdpTransportImp(
       {required this.remoteHost,
+      required this.remoteHostAddress,
       required this.localPort,
       required this.remotePort,
       required this.localBindAddress,
@@ -250,7 +235,7 @@ class _UdpTransportBase extends UdpTransport {
       packet.writeTo(sink);
       sink.closeSync();
       Uint8List encoded = _encode(sink.data);
-      transport.send(encoded, remoteHost, remotePort);
+      transport.send(encoded, remoteHostAddress, remotePort);
     } else {
       //TODO maybe just ignore since udp is connection less in the first place? Or introduce a return value and return false?
       throw new StateError('Can not write a packet on a unbound socket!');

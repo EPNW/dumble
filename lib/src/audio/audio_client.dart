@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'audio_packet.dart';
 
 import '../client_base.dart';
 import '../listeners.dart';
 import '../model/audio.dart';
 import '../model/user.dart';
-import 'udp_transport.dart';
+import 'udp/udp_transport.dart';
 import '../utils/utils.dart' show JsonString;
+import '../platform/platform_options.dart';
 
 /// An AudioFrame contains encoded audio data and optional positional information.
 class AudioFrame with JsonString {
@@ -134,19 +136,10 @@ class AudioClientBase extends AudioClient {
 
   static Future<AudioClientBase> withRemoteHostLookup(
       MumbleClientBase client,
-      bool shouldUseUdp,
-      Object? localBindAddress,
-      int localPort,
+      PlatformOptions platformOptions,
       Duration? incomingAudioStreamTimeout) async {
-    UdpTransport? transport;
-    if (shouldUseUdp) {
-      transport = await UdpTransport.withRemoteHostLookup(
-          cryptStateProvider: client,
-          localBindAddress: localBindAddress,
-          localPort: localPort,
-          remoteHost: client.options.host,
-          remotePort: client.options.port);
-    }
+    UdpTransport? transport = await UdpTransport.withRemoteHostLookup(
+        cryptStateProvider: client, platformOptions: platformOptions);
     return new AudioClientBase(client, transport, incomingAudioStreamTimeout);
   }
 

@@ -7,12 +7,12 @@ import 'client_base.dart';
 import 'model/crypto.dart';
 import 'connection_options.dart';
 import 'audio/audio_client.dart';
-import 'connection.dart' show OnBadCertificate;
 import 'model/server_infos.dart';
 import 'model/text_message.dart';
 import 'model/ban.dart';
 import 'model/stats.dart';
 import 'utils/utils.dart' show JsonString;
+import 'platform/platform_options.dart';
 
 /// The id of the root channel of a Mumble server is always `0`.
 const int rootChannelId = 0;
@@ -50,27 +50,14 @@ abstract class MumbleClient
 
   /// Connects a mumble server.
   ///
-  /// Every Mumble server provides a ssl certificate. If your local runtime does not trust this certificate,
-  /// (e.g. self signed certificates) `onBadCertificate` is invoked with it. There you can decide, how to procceed.
-  ///
-  /// On default, it is tried to use udp for audio transmitting. You can disable this using `useUdp`.
-  /// If using udp you can use `localUdpBindAddress` and `localUdpBindPort` to speficy how the clients
-  /// udp peer should be created. Leave this `null` to listen on all interfaces and
-  /// set localUdpBindPort to 0 to use an ephemeral port.
+  /// Depending on your platform (web or dart vm) there are some platform specific options.
   ///
   /// A disconnected client can not be reconnected, so create a new client instance instead using this method.
   static Future<MumbleClient> connect(
       {required ConnectionOptions options,
-      OnBadCertificate? onBadCertificate,
-      bool useUdp: true,
-      Object? localUdpBindAddress,
-      int localUdpBindPort: 0}) {
+      required PlatformOptions platformOptions}) {
     return MumbleClientBase.connect(
-        options: options,
-        onBadCertificate: onBadCertificate,
-        useUdp: useUdp,
-        localUdpBindAddress: localUdpBindAddress,
-        localUdpBindPort: localUdpBindPort);
+        options: options, platformOptions: platformOptions);
   }
 
   /// Closes the connection to a Mumble server.
