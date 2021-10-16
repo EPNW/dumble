@@ -8,7 +8,7 @@ import 'model/model_exceptions.dart';
 import 'connection/connection.dart';
 import 'generated/Mumble.pb.dart' as Proto;
 import 'connection_options.dart';
-import 'version.dart' as Version;
+import 'version/version.dart' as Version;
 import 'utils/utils.dart' as Utils;
 import 'messages.dart' as Messages;
 import 'exceptions.dart';

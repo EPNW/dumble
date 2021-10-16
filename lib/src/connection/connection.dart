@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import '../platform/platform_options.dart';
 
@@ -17,9 +18,10 @@ abstract class Connection extends StreamView<ProtobufPacket> {
   final ProtobufHeaderPrepender _out;
 
   Connection(
-      {required StreamSink<List<int>> send, required Stream<List<int>> receive})
+      {required StreamSink<List<int>> send, required Stream<Uint8List> receive})
       : this._out = new ProtobufHeaderPrepender(send),
-        super(receive.transform(new ProtobufStreamTransformer()));
+        super(
+            receive.transform<ProtobufPacket>(new ProtobufStreamTransformer()));
 
   static Future<Connection> connect({required PlatformOptions options}) =>
       ConnectionImpl.connect(options: options);

@@ -7,9 +7,9 @@ This examples use [opus_dart](https://pub.dev/packages/opus_dart) for audio enco
 
 ## Web examples
 Convert the example you want to run to JavaScript, name it `out.js` and place it in `web` by using this command.
-You can do all this with the following command (which uses the `connection_example.dart` as example file):
+You can do all this with the following command (which uses the `connect_example.dart` as example file):
 ```sh
-dart2js bin\connection_example.dart -o web\out.js
+dart2js .\bin\connect_example.dart -o .\web\out.js
 ```
 Next, use a http server to serve the `web` directory. For example, you could use the in dart written webserver `dhttpd`.
 First install it globaly using
