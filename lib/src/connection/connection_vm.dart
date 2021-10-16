@@ -4,9 +4,9 @@ import 'connection.dart';
 import '../platform/platform_options.dart';
 import '../platform/platform_options_vm.dart';
 
-class ConnectionImp extends Connection {
+class ConnectionImpl extends Connection {
   final Socket _socket;
-  ConnectionImp._(Socket socket)
+  ConnectionImpl._(Socket socket)
       : this._socket = socket,
         super(receive: socket, send: socket);
 
@@ -16,7 +16,7 @@ class ConnectionImp extends Connection {
         platformOptions.host, platformOptions.port,
         context: platformOptions.context,
         onBadCertificate: platformOptions.onBadCertificate);
-    return new ConnectionImp._(socket);
+    return new ConnectionImpl._(socket);
   }
 
   @override

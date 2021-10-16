@@ -11,7 +11,7 @@ import '../audio_packet.dart';
 import '../../utils/utils.dart' show FilterNullStream;
 import 'dart:async';
 
-class UdpTransportImp extends UdpTransport {
+class UdpTransportImpl extends UdpTransport {
   static Future<UdpTransport?> withRemoteHostLookup(
       {required PlatformOptions platformOptions,
       required CryptStateProvider cryptStateProvider,
@@ -19,7 +19,7 @@ class UdpTransportImp extends UdpTransport {
       Duration? timeout}) async {
     PlatformOptionsVM options = platformOptions as PlatformOptionsVM;
     if (options.udpEnabled) {
-      return new UdpTransportImp(
+      return new UdpTransportImpl(
           remoteHost: options.host,
           remoteHostAddress: (await InternetAddress.lookup(options.host,
                   type: (options.udpLocalBindAddress == null
@@ -71,7 +71,7 @@ class UdpTransportImp extends UdpTransport {
   Duration? get latency => _latency;
   Duration? _latency;
 
-  UdpTransportImp(
+  UdpTransportImpl(
       {required this.remoteHost,
       required this.remoteHostAddress,
       required this.localPort,

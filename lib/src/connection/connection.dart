@@ -22,7 +22,7 @@ abstract class Connection extends StreamView<ProtobufPacket> {
         super(receive.transform(new ProtobufStreamTransformer()));
 
   static Future<Connection> connect({required PlatformOptions options}) =>
-      ConnectionImp.connect(options: options);
+      ConnectionImpl.connect(options: options);
 
   void destroy();
 

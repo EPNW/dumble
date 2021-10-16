@@ -34,7 +34,7 @@ abstract class UdpTransport {
           required CryptStateProvider cryptStateProvider,
           Duration? pingIntervall,
           Duration? timeout}) =>
-      UdpTransportImp.withRemoteHostLookup(
+      UdpTransportImpl.withRemoteHostLookup(
           platformOptions: platformOptions,
           cryptStateProvider: cryptStateProvider,
           pingIntervall: pingIntervall,

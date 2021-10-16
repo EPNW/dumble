@@ -6,7 +6,7 @@ import '../../platform/platform_options.dart';
 
 const String _notOnWeb = 'This operation is not supported on web platforms!';
 
-class UdpTransportImp extends UdpTransport {
+class UdpTransportImpl extends UdpTransport {
   static Future<UdpTransport?> withRemoteHostLookup(
       {required PlatformOptions platformOptions,
       required CryptStateProvider cryptStateProvider,
