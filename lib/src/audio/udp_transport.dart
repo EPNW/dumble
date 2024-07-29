@@ -268,7 +268,7 @@ class _DecryptionException implements Exception {
   String toString() => _msg;
 }
 
-class _BufferSink extends StreamSink<List<int>> {
+class _BufferSink implements StreamSink<List<int>> {
   final Completer<void> _done;
   final List<List<int>> _buffer;
   Uint8List? _data;

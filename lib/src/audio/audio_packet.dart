@@ -168,7 +168,7 @@ class OutgoingAudioPacket extends AudioPacket {
 
   OutgoingAudioPacket(
       {required AudioCodec codec,
-      int voiceTarget: normalTalking,
+      int voiceTarget = normalTalking,
       required int sequenceNumber,
       required List<Uint8List> frames,
       required bool endOfTransmission,

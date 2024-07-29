@@ -109,7 +109,7 @@ class VarIntResult {
   const VarIntResult._(this.value, this.lengthInBytes);
 
   @override
-  bool operator ==(dynamic other) =>
+  bool operator ==(Object other) =>
       other is VarIntResult &&
       other.value == this.value &&
       other.lengthInBytes == lengthInBytes;

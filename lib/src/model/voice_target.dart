@@ -45,8 +45,8 @@ class VoiceTarget with JsonString {
 
   void withChannel(
       {required Channel channel,
-      bool followLinks: false,
-      bool recursive: false}) {
+      bool followLinks = false,
+      bool recursive = false}) {
     _channels.add(channel);
     _channelLinks.add(followLinks);
     _channelRecursive.add(recursive);

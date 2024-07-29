@@ -31,7 +31,7 @@ class RegisteredUser with JsonString {
       {required this.userId, this.name, this.lastSeen, this.lastChannel});
 
   @override
-  Map<String, Object> jsonMap({bool serializeChannel: false}) {
+  Map<String, Object> jsonMap({bool serializeChannel = false}) {
     Map<String, Object> map = new Map<String, Object>()..['userId'] = userId;
     if (name != null) {
       map['name'] = name!;

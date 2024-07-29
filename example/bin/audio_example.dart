@@ -161,6 +161,7 @@ class WaitingTransformer<T> extends StreamTransformerBase<T, T> {
   Stream<T> bind(Stream<T> stream) {
     Timer? t;
     StreamController<T> controller =
+        // ignore: dead_code
         new StreamController<T>(onCancel: t?.cancel, sync: true);
     stream.toList().then((List<T> data) {
       if (!controller.isClosed && data.isNotEmpty) {

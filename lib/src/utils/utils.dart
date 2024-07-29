@@ -38,13 +38,13 @@ mixin JsonString {
   Map<String, Object> jsonMap();
 
   @override
-  String toString({bool tabIndent: true}) =>
+  String toString({bool tabIndent = true}) =>
       (tabIndent ? _tabIndent : json.encoder).convert(jsonMap());
 }
 
 extension ByteAddress on InternetAddress {
   static InternetAddress fromBytes(Uint8List bytes,
-      {bool asIPv4IfPossible: false}) {
+      {bool asIPv4IfPossible = false}) {
     if (bytes.length == 4) {
       return new InternetAddress(bytes.join('.'));
     } else if (bytes.length == 16) {

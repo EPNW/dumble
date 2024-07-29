@@ -118,9 +118,9 @@ class MumbleClientBase extends MumbleClient
   static Future<MumbleClient> connect(
       {required ConnectionOptions.ConnectionOptions options,
       OnBadCertificate? onBadCertificate,
-      bool useUdp: true,
+      bool useUdp = true,
       Object? localUdpBindAddress,
-      int localUdpBindPort: 0}) async {
+      int localUdpBindPort = 0}) async {
     ExtendedCompleter<void> syncCompleter = new ExtendedCompleter<void>();
     Connection con = await Connection.connect(
         host: options.host,

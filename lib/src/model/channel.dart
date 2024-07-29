@@ -141,7 +141,7 @@ class Channel with Notifier<ChannelListener>, JsonString {
   Channel._(this.channelId, this._client) : this._links = <Channel>[];
 
   @override
-  Map<String, Object> jsonMap({int serializeParentRecursionDepth: 0}) {
+  Map<String, Object> jsonMap({int serializeParentRecursionDepth = 0}) {
     Map<String, Object> map = new Map<String, Object>()
       ..['channelId'] = channelId;
     if (parent != null) {
@@ -220,13 +220,15 @@ class Channel with Notifier<ChannelListener>, JsonString {
         ..maxUsers = maxUsers);
 
   void registerAsVoiceTarget(
-          {required int id, bool recursive: false, bool followLinks: false}) =>
+          {required int id,
+          bool recursive = false,
+          bool followLinks = false}) =>
       _client.registerVoiceTarget(
           target: new VoiceTarget(id: id)
             ..withChannel(
                 channel: this, recursive: recursive, followLinks: followLinks));
 
-  void sendMessageToChannel({required String message, bool recursive: false}) {
+  void sendMessageToChannel({required String message, bool recursive = false}) {
     OutgoingTextMessage msg;
     if (recursive) {
       msg = new OutgoingTextMessage(message: message, trees: <Channel>[this]);

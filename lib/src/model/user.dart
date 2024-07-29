@@ -209,7 +209,7 @@ class User with Notifier<UserListener>, JsonString {
   User._(this.session, this._client, this._channel);
 
   @override
-  Map<String, Object> jsonMap({bool serializeChannel: false}) {
+  Map<String, Object> jsonMap({bool serializeChannel = false}) {
     Map<String, Object> map = new Map<String, Object>()..['session'] = session;
     if (name != null) {
       map['name'] = name!;
@@ -312,7 +312,7 @@ class User with Notifier<UserListener>, JsonString {
     _client.writeMessage(msg);
   }
 
-  void requestUserStats({bool statsOnly: false}) =>
+  void requestUserStats({bool statsOnly = false}) =>
       _client.writeMessage(new Proto.UserStats()
         ..session = session
         ..statsOnly = statsOnly);

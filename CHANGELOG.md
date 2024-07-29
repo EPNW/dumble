@@ -1,3 +1,7 @@
+# [0.9.0] - 29.07.2024
+  * Updated dependencies
+  * Regenerated protbuf
+
 # [0.8.9] - 10.08.2021
   * Fixed a bug where if joining a server and someone was already talking, the audio was missed
 

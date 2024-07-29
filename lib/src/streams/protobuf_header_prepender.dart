@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'protobuf_packet.dart';
 
-class ProtobufHeaderPrepender extends StreamSink<ProtobufPacket> {
+class ProtobufHeaderPrepender implements StreamSink<ProtobufPacket> {
   final StreamSink<List<int>> _wrapped;
   StreamSink<List<int>> get wrapped => _wrapped;
   ProtobufHeaderPrepender(this._wrapped);

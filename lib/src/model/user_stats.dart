@@ -100,7 +100,7 @@ class UserStats with JsonString {
   ///If withCertificates is true and the stats contain certificates, they are printed in binary.
   ///If withCertificates is false and the stats contain certificates, their count is printed.
   @override
-  Map<String, Object> jsonMap({bool withCertificates: false}) {
+  Map<String, Object> jsonMap({bool withCertificates = false}) {
     Map<String, Object> map = new Map<String, Object>();
     map['pingStats'] = pingStats.jsonMap();
     if (certificates.isNotEmpty) {

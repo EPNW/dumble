@@ -31,7 +31,7 @@ class Ocb2Aes128 {
   CryptionResult encrypt(
       {required Uint8List plaintext,
       required CryptState state,
-      bool increaseClientNonce: true}) {
+      bool increaseClientNonce = true}) {
     if (increaseClientNonce) {
       state.increaseClientNonce();
     }
@@ -80,7 +80,7 @@ class Ocb2Aes128 {
       {required Uint8List ciphertext,
       required int serverNonceLsb,
       required CryptState state,
-      bool updateServerNonce: true}) {
+      bool updateServerNonce = true}) {
     if (updateServerNonce) {
       state.updateServerNonce(serverNonceLsb);
     }

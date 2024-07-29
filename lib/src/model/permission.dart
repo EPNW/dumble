@@ -64,23 +64,23 @@ class Permission with JsonString {
         this.resetUserContent = (value & _resetUserContent) != 0;
 
   const Permission(
-      {bool write: false,
-      bool traverse: false,
-      bool enter: false,
-      bool speak: false,
-      bool muteDeafen: false,
-      bool move: false,
-      bool makeChannel: false,
-      bool linkChannel: false,
-      bool whisper: false,
-      bool textMessage: false,
-      bool makeTempChannel: false,
-      bool listen: false,
-      bool kick: false,
-      bool ban: false,
-      bool register: false,
-      bool selfRegister: false,
-      bool resetUserContent: false})
+      {bool write = false,
+      bool traverse = false,
+      bool enter = false,
+      bool speak = false,
+      bool muteDeafen = false,
+      bool move = false,
+      bool makeChannel = false,
+      bool linkChannel = false,
+      bool whisper = false,
+      bool textMessage = false,
+      bool makeTempChannel = false,
+      bool listen = false,
+      bool kick = false,
+      bool ban = false,
+      bool register = false,
+      bool selfRegister = false,
+      bool resetUserContent = false})
       : this.write = write,
         this.traverse = traverse,
         this.enter = enter,
@@ -120,8 +120,8 @@ class Permission with JsonString {
   int get hashCode => intValue;
 
   @override
-  bool operator ==(dynamic other) {
-    if (other != null && other is Permission) {
+  bool operator ==(Object other) {
+    if (other is Permission) {
       return (intValue | _cached) == (other.intValue | _cached);
     } else {
       return false;

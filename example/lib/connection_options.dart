@@ -1,12 +1,13 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dumble/dumble.dart';
 
 final ConnectionOptions defaulConnectionOptions = new ConnectionOptions(
-    host: 'epnw.eu',
+    host: 'thewire01.pdeg.de',
     port: 64738,
-    name: 'Dumble2',
-    password: 'Pandela',
+    password: null,
+    name: 'DumbleExample_${Random().nextInt(1 << 32)}',
     pingTimeout: const Duration(seconds: 5));
 
 /// Connect a Mumble server with a user certificate.

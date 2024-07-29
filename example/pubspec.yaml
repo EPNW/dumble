@@ -1,9 +1,9 @@
 name: dumble_examples
-version: 2.0.0
+version: 2.1.0
 description: Examples how to use the dumble Mumble client
 publish_to: 'none'
 environment:
-  sdk: ">=2.12.0 <3.0.0"
+  sdk: '>=3.4.3 <4.0.0'
 dependencies:
   opus_dart: ^3.0.0
   dumble:

@@ -53,7 +53,7 @@ class ConnectionOptions with JsonString {
       required this.name,
       this.context,
       this.password,
-      this.opus: true,
+      this.opus = true,
       this.tokens = const <String>[],
       this.celtVersions = const <int>[],
       this.incomingAudioStreamTimeout = const Duration(milliseconds: 500),

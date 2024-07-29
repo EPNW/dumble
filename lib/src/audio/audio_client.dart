@@ -107,7 +107,7 @@ abstract class AudioClient with Notifier<AudioListener> {
   /// See the [Mumble voice data specification](https://mumble-protocol.readthedocs.io/en/latest/voice_data.html) for mor details.
   AudioFrameSink sendAudio(
       {required AudioCodec codec,
-      int voiceTarget: normalTalking,
+      int voiceTarget = normalTalking,
       int framesPerPacket});
 }
 
@@ -160,7 +160,7 @@ class AudioClientBase extends AudioClient {
       _udpTransport!
           .useUdp(onResyncRequest: _client.requestCryptStateResync)
           .listen(_onUdpAvailabilityChange);
-      _udpTransport!.audio
+      _udpTransport.audio
           .listen((IncomingAudioPacket packet) => feed(packet, true));
     }
   }
@@ -241,7 +241,7 @@ class AudioClientBase extends AudioClient {
   @override
   AudioFrameSink sendAudio(
       {required AudioCodec codec,
-      int voiceTarget: normalTalking,
+      int voiceTarget = normalTalking,
       int framesPerPacket = 1}) {
     framesPerPacket = codec == AudioCodec.opus ? 1 : framesPerPacket;
     AudioFrameSinkBase sink;
@@ -263,7 +263,7 @@ typedef void AudioErrorCallback(dynamic error, [StackTrace? stackTrace]);
 /// A sink for [AudioFrame]s that should be transported to the Mumble server.
 ///
 /// Use the [onError] callback to receive transport errors.
-abstract class AudioFrameSink extends StreamSink<AudioFrame> {
+abstract class AudioFrameSink implements StreamSink<AudioFrame> {
   /// Invoked when an audio error occurs
   AudioErrorCallback? onError;
 
@@ -394,7 +394,7 @@ abstract class AudioFrameSinkBase extends AudioFrameSink {
   }
 
   @override
-  Future close({bool gracefully: true}) async {
+  Future close({bool gracefully = true}) async {
     if (!_done.isCompleted) {
       if (gracefully) _flush(true);
       _done.complete();

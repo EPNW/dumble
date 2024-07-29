@@ -62,9 +62,9 @@ abstract class MumbleClient
   static Future<MumbleClient> connect(
       {required ConnectionOptions options,
       OnBadCertificate? onBadCertificate,
-      bool useUdp: true,
+      bool useUdp = true,
       Object? localUdpBindAddress,
-      int localUdpBindPort: 0}) {
+      int localUdpBindPort = 0}) {
     return MumbleClientBase.connect(
         options: options,
         onBadCertificate: onBadCertificate,
