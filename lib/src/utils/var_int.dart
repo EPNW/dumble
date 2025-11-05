@@ -53,13 +53,13 @@ extension VarIntExtension on ByteData {
       this.setUint8(index, _target32);
       this.setUint32(index + 1, value);
       lengthInBytes = 5;
-    } else if (value <= 0x7FFFFFFFFFFFFFFF) {
+    } else if (value < 0x8000000000000000) {
       this.setUint8(index, _target64);
       this.setUint64(index + 1, value);
       lengthInBytes = 9;
     } else {
       throw new ArgumentError.value(
-          value, 'value', 'must not exceed 0x7FFFFFFFFFFFFFFF!');
+          value, 'value', 'must not exceed 0x8000000000000000!');
     }
     return lengthInBytes;
   }
